@@ -49,6 +49,7 @@ def evolve(
         iterations=iterations,
         optimizer_model=optimizer_model,
         eval_model=eval_model,
+        judge_model=eval_model,  # Use same model for dataset generation
         run_pytest=run_tests,
     )
     if hermes_repo:
