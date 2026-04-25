@@ -12,6 +12,11 @@ from typing import Optional
 import dspy
 
 
+# Unique sentinel that cannot appear in any skill content.
+# HTML comment format — markdown/skills never contain HTML comments.
+_SKILL_BODY_SENTINEL_ = "\n\n<!-- ___SKILL_EVOLUTION_SENTINEL___ -->\n\n"
+
+
 def load_skill(skill_path: Path) -> dict:
     """Load a skill file and parse its frontmatter + body.
 
@@ -87,20 +92,26 @@ class SkillModule(dspy.Module):
     The skill text body is embedded in the signature's instructions so that
     GEPA/MIPROv2 can actually propose mutations to it. The skill text is NOT
     passed as an InputField (which would make it invisible to DSPy optimizers).
+
+    The original skill body is also stored separately in self.skill_body so
+    it can be recovered after optimization even if the instruction text is
+    replaced entirely by the optimizer.
     """
 
     def __init__(self, skill_text: str):
         super().__init__()
-        self.skill_text = skill_text
+        # Store original body separately — needed for recovery after optimization
+        # since optimizer may replace instruction text entirely.
+        self.skill_body = skill_text
 
         # Embed skill text in the signature instructions so GEPA can optimize it.
-        # We use a wrapper that references the skill text as the instruction source.
-        # The skill text goes into the docstring/instructions that GEPA mutates.
+        # Use a unique HTML-comment sentinel (cannot appear in any skill content).
         base_sig = self.TaskWithSkill
         base_instructions = base_sig.__doc__ or ""
         enriched_instructions = (
             f"Follow these skill instructions to complete the task:\n\n"
-            f"{skill_text}\n\n---\n"
+            f"{skill_text}"
+            + _SKILL_BODY_SENTINEL_
             + base_instructions
         )
         custom_sig = base_sig.with_instructions(enriched_instructions)

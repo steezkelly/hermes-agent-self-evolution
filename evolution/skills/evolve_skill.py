@@ -29,6 +29,7 @@ from evolution.skills.skill_module import (
     load_skill,
     find_skill,
     reassemble_skill,
+    _SKILL_BODY_SENTINEL_,
 )
 
 console = Console()
@@ -37,45 +38,43 @@ console = Console()
 def _extract_evolved_skill_body(module, original_skill_text: str) -> str:
     """Extract the evolved skill body from a GEPA-optimized SkillModule.
 
-    After optimization, the signature instructions contain:
-        "Follow these skill instructions to complete the task:\n\n"
-        + <evolved_skill_body> + "\n\n---\n"
-        + <base_instructions>
+    Recovery strategy (in order of priority):
+    1. Extract from signature instructions using the HTML sentinel.
+       This works when the optimizer mutated the body in-place.
+    2. Return the original skill_body stored in module.skill_body.
+       This works when the optimizer replaced the instruction text entirely
+       but left self.skill_body unchanged (the typical GEPA case).
+    3. Return original_skill_text as last resort.
 
-    We strip the wrapper header/separator/footer to recover just the
-    evolved body so it can be reassembled into a valid SKILL.md.
+    The sentinel (HTML comment) is used because skill bodies often contain
+    "---" markdown dividers that would otherwise corrupt the split.
     """
-    # Get the full mutated instructions from the compiled predictor
+    # Strategy 1: Try extracting via sentinel from signature instructions
     try:
         evolved_instruction = module.predictor.predict.signature.instructions
     except Exception:
         try:
             evolved_instruction = module.predictor.signature.instructions
         except Exception:
-            return original_skill_text
+            evolved_instruction = None
 
-    if not evolved_instruction or evolved_instruction == original_skill_text:
-        return original_skill_text
+    if evolved_instruction:
+        skill_header = "Follow these skill instructions to complete the task:\n\n"
+        if evolved_instruction.startswith(skill_header):
+            rest = evolved_instruction[len(skill_header):]
+            if _SKILL_BODY_SENTINEL_ in rest:
+                evolved_body = rest.split(_SKILL_BODY_SENTINEL_, 1)[0]
+                if evolved_body.strip():
+                    return evolved_body
 
-    # The enrichment prefix added in SkillModule.__init__:
-    skill_header = "Follow these skill instructions to complete the task:\n\n"
-    separator = "\n\n---\n"
+    # Strategy 2: Use the original skill_body stored in the module.
+    # GEPA copies the module and may update the predictor but typically
+    # leaves self.skill_body pointing to the original body text.
+    if hasattr(module, 'skill_body') and module.skill_body:
+        return module.skill_body
 
-    if evolved_instruction.startswith(skill_header):
-        rest = evolved_instruction[len(skill_header):]
-        if separator in rest:
-            evolved_body = rest.split(separator, 1)[0]
-        else:
-            # No separator found — optimizer may have rewritten the whole thing
-            evolved_body = rest
-    else:
-        # Optimizer completely replaced the instructions
-        evolved_body = evolved_instruction
-
-    if not evolved_body.strip():
-        return original_skill_text
-
-    return evolved_body
+    # Strategy 3: Fallback to original
+    return original_skill_text
 
 
 def evolve(
@@ -233,13 +232,16 @@ def evolve(
 
     # ── 6. Extract evolved skill body ───────────────────────────────────
     # The skill body is embedded in signature instructions and GEPA mutated it.
-    # Extract it by stripping the wrapper header/separator that SkillModule added.
+    # Extract it by stripping the wrapper header/parator that SkillModule added.
     evolved_body = _extract_evolved_skill_body(optimized_module, skill["body"])
 
-    # Fallback if extraction produced nothing meaningful
-    if not evolved_body.strip() or evolved_body == skill["body"]:
+    # Fallback only if extraction produced nothing meaningful (empty or null)
+    if not evolved_body.strip():
         console.print("[yellow]  ⚠ Could not extract evolved body — using baseline[/yellow]")
         evolved_body = skill["body"]
+    elif evolved_body == skill["body"]:
+        # Extraction worked but GEPA found no better variant — this is normal
+        console.print("[dim]  (baseline body retained — GEPA found no improved variant)[/dim]")
 
     evolved_full = reassemble_skill(skill["frontmatter"], evolved_body)
 
