@@ -6,6 +6,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -31,6 +32,50 @@ from evolution.skills.skill_module import (
 )
 
 console = Console()
+
+
+def _extract_evolved_skill_body(module, original_skill_text: str) -> str:
+    """Extract the evolved skill body from a GEPA-optimized SkillModule.
+
+    After optimization, the signature instructions contain:
+        "Follow these skill instructions to complete the task:\n\n"
+        + <evolved_skill_body> + "\n\n---\n"
+        + <base_instructions>
+
+    We strip the wrapper header/separator/footer to recover just the
+    evolved body so it can be reassembled into a valid SKILL.md.
+    """
+    # Get the full mutated instructions from the compiled predictor
+    try:
+        evolved_instruction = module.predictor.predict.signature.instructions
+    except Exception:
+        try:
+            evolved_instruction = module.predictor.signature.instructions
+        except Exception:
+            return original_skill_text
+
+    if not evolved_instruction or evolved_instruction == original_skill_text:
+        return original_skill_text
+
+    # The enrichment prefix added in SkillModule.__init__:
+    skill_header = "Follow these skill instructions to complete the task:\n\n"
+    separator = "\n\n---\n"
+
+    if evolved_instruction.startswith(skill_header):
+        rest = evolved_instruction[len(skill_header):]
+        if separator in rest:
+            evolved_body = rest.split(separator, 1)[0]
+        else:
+            # No separator found — optimizer may have rewritten the whole thing
+            evolved_body = rest
+    else:
+        # Optimizer completely replaced the instructions
+        evolved_body = evolved_instruction
+
+    if not evolved_body.strip():
+        return original_skill_text
+
+    return evolved_body
 
 
 def evolve(
@@ -119,7 +164,7 @@ def evolve(
     # ── 3. Validate constraints on baseline ─────────────────────────────
     console.print(f"\n[bold]Validating baseline constraints[/bold]")
     validator = ConstraintValidator(config)
-    baseline_constraints = validator.validate_all(skill["body"], "skill")
+    baseline_constraints = validator.validate_all(skill["raw"], "skill")
     all_pass = True
     for c in baseline_constraints:
         icon = "✓" if c.passed else "✗"
@@ -137,11 +182,12 @@ def evolve(
     console.print(f"  Optimizer model: {optimizer_model}")
     console.print(f"  Eval model: {eval_model}")
 
-    # Configure DSPy
-    lm = dspy.LM(eval_model)
+    # Configure DSPy LM with retry handling for rate limits (PR #35)
+    _base = os.getenv("OPENROUTER_BASE_URL")
+    lm = dspy.LM(eval_model, api_base=_base, num_retries=8) if _base else dspy.LM(eval_model, num_retries=8)
     dspy.configure(lm=lm)
 
-    # Create the baseline skill module
+    # Create the baseline skill module — skill text embedded in signature instructions
     baseline_module = SkillModule(skill["body"])
 
     # Prepare DSPy examples
@@ -154,9 +200,13 @@ def evolve(
     start_time = time.time()
 
     try:
+        _base = os.getenv("OPENROUTER_BASE_URL")
+        _ref_lm = dspy.LM(optimizer_model, api_base=_base) if _base else dspy.LM(optimizer_model)
+        # PR #35: use max_metric_calls (not max_full_evals); do NOT mix with auto="light"
         optimizer = dspy.GEPA(
             metric=skill_fitness_metric,
-            max_steps=iterations,
+            max_metric_calls=iterations * 10,  # metric calls budget
+            reflection_lm=_ref_lm,
         )
 
         optimized_module = optimizer.compile(
@@ -167,9 +217,11 @@ def evolve(
     except Exception as e:
         # Fall back to MIPROv2 if GEPA isn't available in this DSPy version
         console.print(f"[yellow]GEPA not available ({e}), falling back to MIPROv2[/yellow]")
+        # PR #35: add num_threads=1 to serialize eval calls and avoid rate limits
         optimizer = dspy.MIPROv2(
             metric=skill_fitness_metric,
             auto="light",
+            num_threads=1,
         )
         optimized_module = optimizer.compile(
             baseline_module,
@@ -179,14 +231,22 @@ def evolve(
     elapsed = time.time() - start_time
     console.print(f"\n  Optimization completed in {elapsed:.1f}s")
 
-    # ── 6. Extract evolved skill text ───────────────────────────────────
-    # The optimized module's instructions contain the evolved skill text
-    evolved_body = optimized_module.skill_text
+    # ── 6. Extract evolved skill body ───────────────────────────────────
+    # The skill body is embedded in signature instructions and GEPA mutated it.
+    # Extract it by stripping the wrapper header/separator that SkillModule added.
+    evolved_body = _extract_evolved_skill_body(optimized_module, skill["body"])
+
+    # Fallback if extraction produced nothing meaningful
+    if not evolved_body.strip() or evolved_body == skill["body"]:
+        console.print("[yellow]  ⚠ Could not extract evolved body — using baseline[/yellow]")
+        evolved_body = skill["body"]
+
     evolved_full = reassemble_skill(skill["frontmatter"], evolved_body)
 
     # ── 7. Validate evolved skill ───────────────────────────────────────
     console.print(f"\n[bold]Validating evolved skill[/bold]")
-    evolved_constraints = validator.validate_all(evolved_body, "skill", baseline_text=skill["body"])
+    # PR #35: pass evolved_full (reassembled with frontmatter), not body-only
+    evolved_constraints = validator.validate_all(evolved_full, "skill", baseline_text=skill["raw"])
     all_pass = True
     for c in evolved_constraints:
         icon = "✓" if c.passed else "✗"

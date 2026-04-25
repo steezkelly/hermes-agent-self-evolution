@@ -1,8 +1,8 @@
 """Wraps a SKILL.md file as a DSPy module for optimization.
 
 The key abstraction: a skill file becomes a parameterized DSPy module
-where the skill text is the optimizable parameter. GEPA can then
-mutate the skill text and evaluate the results.
+where the skill text is the optimizable parameter via signature instructions.
+GEPA can then mutate the skill text and evaluate the results.
 """
 
 import re
@@ -84,12 +84,27 @@ def find_skill(skill_name: str, hermes_agent_path: Path) -> Optional[Path]:
 class SkillModule(dspy.Module):
     """A DSPy module that wraps a skill file for optimization.
 
-    The skill text (body) is the parameter that GEPA optimizes.
-    On each forward pass, the module:
-    1. Uses the skill text as instructions
-    2. Processes the task input
-    3. Returns the agent's response
+    The skill text body is embedded in the signature's instructions so that
+    GEPA/MIPROv2 can actually propose mutations to it. The skill text is NOT
+    passed as an InputField (which would make it invisible to DSPy optimizers).
     """
+
+    def __init__(self, skill_text: str):
+        super().__init__()
+        self.skill_text = skill_text
+
+        # Embed skill text in the signature instructions so GEPA can optimize it.
+        # We use a wrapper that references the skill text as the instruction source.
+        # The skill text goes into the docstring/instructions that GEPA mutates.
+        base_sig = self.TaskWithSkill
+        base_instructions = base_sig.__doc__ or ""
+        enriched_instructions = (
+            f"Follow these skill instructions to complete the task:\n\n"
+            f"{skill_text}\n\n---\n"
+            + base_instructions
+        )
+        custom_sig = base_sig.with_instructions(enriched_instructions)
+        self.predictor = dspy.ChainOfThought(custom_sig)
 
     class TaskWithSkill(dspy.Signature):
         """Complete a task following the provided skill instructions.
@@ -97,20 +112,12 @@ class SkillModule(dspy.Module):
         You are an AI agent following specific skill instructions to complete a task.
         Read the skill instructions carefully and follow the procedure described.
         """
-        skill_instructions: str = dspy.InputField(desc="The skill instructions to follow")
         task_input: str = dspy.InputField(desc="The task to complete")
         output: str = dspy.OutputField(desc="Your response following the skill instructions")
 
-    def __init__(self, skill_text: str):
-        super().__init__()
-        self.skill_text = skill_text
-        self.predictor = dspy.ChainOfThought(self.TaskWithSkill)
-
     def forward(self, task_input: str) -> dspy.Prediction:
-        result = self.predictor(
-            skill_instructions=self.skill_text,
-            task_input=task_input,
-        )
+        # skill_text is now in the signature instructions, not passed as InputField
+        result = self.predictor(task_input=task_input)
         return dspy.Prediction(output=result.output)
 
 
