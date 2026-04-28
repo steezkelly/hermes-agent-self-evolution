@@ -6,7 +6,6 @@ Usage:
 """
 
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -24,6 +23,7 @@ from evolution.core.dataset_builder import SyntheticDatasetBuilder, EvalDataset,
 from evolution.core.external_importers import build_dataset_from_external
 from evolution.core.fitness import skill_fitness_metric, LLMJudge, FitnessScore
 from evolution.core.constraints import ConstraintValidator
+from evolution.core.nous_auth import _get_lm_kwargs
 from evolution.skills.skill_module import (
     SkillModule,
     load_skill,
@@ -38,16 +38,17 @@ console = Console()
 def _extract_evolved_skill_body(module, original_skill_text: str) -> str:
     """Extract the evolved skill body from a GEPA-optimized SkillModule.
 
+    GEPA replaces the instruction text entirely (not mutates in-place), so the
+    sentinel-based extraction only works for the baseline (un-evolved) copy.
+    For evolved copies, the instruction text IS the evolved skill body —
+    return it directly.
+
     Recovery strategy (in order of priority):
     1. Extract from signature instructions using the HTML sentinel.
-       This works when the optimizer mutated the body in-place.
-    2. Return the original skill_body stored in module.skill_body.
-       This works when the optimizer replaced the instruction text entirely
-       but left self.skill_body unchanged (the typical GEPA case).
+       Works for un-evolved baseline or if GEPA preserved the structure.
+    2. If instructions were replaced by GEPA (no sentinel), use them directly
+       as the evolved skill body.
     3. Return original_skill_text as last resort.
-
-    The sentinel (HTML comment) is used because skill bodies often contain
-    "---" markdown dividers that would otherwise corrupt the split.
     """
     # Strategy 1: Try extracting via sentinel from signature instructions
     try:
@@ -67,13 +68,19 @@ def _extract_evolved_skill_body(module, original_skill_text: str) -> str:
                 if evolved_body.strip():
                     return evolved_body
 
-    # Strategy 2: Use the original skill_body stored in the module.
-    # GEPA copies the module and may update the predictor but typically
-    # leaves self.skill_body pointing to the original body text.
+        # Strategy 2: GEPA replaced instructions entirely — use them directly
+        # Filter out the base instruction suffix if GEPA accidentally included it
+        candidate = evolved_instruction
+        if _SKILL_BODY_SENTINEL_ in candidate:
+            candidate = candidate.split(_SKILL_BODY_SENTINEL_, 1)[0]
+        if candidate.strip() and candidate != original_skill_text:
+            return candidate
+
+    # Strategy 3: Use the original skill_body stored in the module.
     if hasattr(module, 'skill_body') and module.skill_body:
         return module.skill_body
 
-    # Strategy 3: Fallback to original
+    # Strategy 4: Fallback to original
     return original_skill_text
 
 
@@ -87,6 +94,7 @@ def evolve(
     hermes_repo: Optional[str] = None,
     run_tests: bool = False,
     dry_run: bool = False,
+    stats_csv: Optional[str] = None,
 ):
     """Main evolution function — orchestrates the full optimization loop."""
 
@@ -109,7 +117,11 @@ def evolve(
         sys.exit(1)
 
     skill = load_skill(skill_path)
-    console.print(f"  Loaded: {skill_path.relative_to(config.hermes_agent_path)}")
+    try:
+        rel = skill_path.relative_to(config.hermes_agent_path)
+    except ValueError:
+        rel = skill_path
+    console.print(f"  Loaded: {rel}")
     console.print(f"  Name: {skill['name']}")
     console.print(f"  Size: {len(skill['raw']):,} chars")
     console.print(f"  Description: {skill['description'][:80]}...")
@@ -182,8 +194,9 @@ def evolve(
     console.print(f"  Eval model: {eval_model}")
 
     # Configure DSPy LM with retry handling for rate limits (PR #35)
-    _base = os.getenv("OPENROUTER_BASE_URL")
-    lm = dspy.LM(eval_model, api_base=_base, num_retries=8) if _base else dspy.LM(eval_model, num_retries=8)
+    lm_kwargs, eval_model_used = _get_lm_kwargs(eval_model)
+    lm_kwargs["num_retries"] = 8
+    lm = dspy.LM(eval_model_used, **lm_kwargs)
     dspy.configure(lm=lm)
 
     # Create the baseline skill module — skill text embedded in signature instructions
@@ -199,13 +212,13 @@ def evolve(
     start_time = time.time()
 
     try:
-        _base = os.getenv("OPENROUTER_BASE_URL")
-        _ref_lm = dspy.LM(optimizer_model, api_base=_base) if _base else dspy.LM(optimizer_model)
+        ref_lm_kwargs, optimizer_model_used = _get_lm_kwargs(optimizer_model)
+        ref_lm = dspy.LM(optimizer_model_used, **ref_lm_kwargs)
         # PR #35: use max_metric_calls (not max_full_evals); do NOT mix with auto="light"
         optimizer = dspy.GEPA(
             metric=skill_fitness_metric,
             max_metric_calls=iterations * 10,  # metric calls budget
-            reflection_lm=_ref_lm,
+            reflection_lm=ref_lm,
         )
 
         optimized_module = optimizer.compile(
@@ -228,7 +241,9 @@ def evolve(
         )
 
     elapsed = time.time() - start_time
-    console.print(f"\n  Optimization completed in {elapsed:.1f}s")
+    optimizer_type = type(optimizer).__name__
+    console.print(f"  Optimizer used: {optimizer_type}")
+    console.print(f"  Completed in {elapsed:.1f}s")
 
     # ── 6. Extract evolved skill body ───────────────────────────────────
     # The skill body is embedded in signature instructions and GEPA mutated it.
@@ -347,6 +362,48 @@ def evolve(
 
     console.print(f"\n  Output saved to {output_dir}/")
 
+    # ── 11. Append to stats CSV for analysis ─────────────────────────────────
+    if stats_csv:
+        import csv
+        import os
+        csv_path = Path(stats_csv)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        write_header = not csv_path.exists()
+        with open(csv_path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "timestamp", "skill_name", "provider", "eval_source", "optimizer_type",
+                "iterations", "optimizer_model", "eval_model",
+                "train_n", "val_n", "holdout_n",
+                "baseline_holdout", "evolved_holdout",
+                "improvement", "improvement_pct",
+                "baseline_size", "evolved_size",
+                "elapsed_seconds", "constraints_passed",
+            ])
+            if write_header:
+                writer.writeheader()
+            writer.writerow({
+                "timestamp": timestamp,
+                "skill_name": skill_name,
+                "provider": os.environ.get("PROVIDER", "openrouter"),
+                "eval_source": eval_source,
+                "optimizer_type": optimizer_type,
+                "iterations": iterations,
+                "optimizer_model": optimizer_model,
+                "eval_model": eval_model,
+                "train_n": len(dataset.train),
+                "val_n": len(dataset.val),
+                "holdout_n": len(dataset.holdout),
+                "baseline_holdout": round(avg_baseline, 6),
+                "evolved_holdout": round(avg_evolved, 6),
+                "improvement": round(improvement, 6),
+                "improvement_pct": round((improvement / max(avg_baseline, 0.001)) * 100, 2),
+                "baseline_size": len(skill["body"]),
+                "evolved_size": len(evolved_body),
+                "elapsed_seconds": round(elapsed, 1),
+                "constraints_passed": all_pass,
+            })
+        console.print(f"  Stats appended to {csv_path}")
+
     if improvement > 0:
         console.print(f"\n[bold green]✓ Evolution improved skill by {improvement:+.3f} ({improvement/max(0.001, avg_baseline)*100:+.1f}%)[/bold green]")
         console.print(f"  Review the diff: diff {output_dir}/baseline_skill.md {output_dir}/evolved_skill.md")
@@ -366,7 +423,8 @@ def evolve(
 @click.option("--hermes-repo", default=None, help="Path to hermes-agent repo")
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run):
+@click.option("--stats-csv", default=None, help="Append run stats to a CSV file for analysis")
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
     evolve(
         skill_name=skill,
@@ -378,6 +436,7 @@ def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_mod
         hermes_repo=hermes_repo,
         run_tests=run_tests,
         dry_run=dry_run,
+        stats_csv=stats_csv,
     )
 
 
