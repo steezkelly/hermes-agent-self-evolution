@@ -347,10 +347,14 @@ def v2_dispatch(
 
     # ── 6. PostHoc Analysis ──────────────────────────────────────────────
     # Extract score trajectory for power-law fitting
-    score_trajectory = [m["avg_baseline"] for m in run_metrics] if run_metrics else []
-    if best_score > 0 and (not score_trajectory or abs(score_trajectory[-1] - best_score) > 0.001):
-        score_trajectory.append(best_score)
-    posthoc_report = posthoc.analyze(score_trajectory) if len(score_trajectory) >= 2 else None
+    # Use best score over time: baseline initially, then best score after each attempt
+    score_trajectory = []
+    if run_metrics:
+        score_trajectory.append(run_metrics[0]["avg_baseline"])  # Starting baseline
+        for m in run_metrics:
+            best = max(m["avg_baseline"], m["avg_evolved"])
+            score_trajectory.append(max(score_trajectory[-1], best))
+    posthoc_report = posthoc.analyze(score_trajectory) if len(score_trajectory) >= 4 else None
     if posthoc_report:
         console.print(f"\n[bold]PostHoc Analysis[/bold]")
         console.print(f"  {posthoc_report.summary}")
