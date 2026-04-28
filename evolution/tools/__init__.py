@@ -1,1 +1,1 @@
-"""Phase placeholder: tools evolution."""
+# evolution.tools — Support tools for the evolution pipeline
