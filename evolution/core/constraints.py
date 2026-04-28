@@ -119,7 +119,17 @@ class ConstraintValidator:
 
     def _check_growth(self, text: str, baseline: str, artifact_type: str) -> ConstraintResult:
         growth = (len(text) - len(baseline)) / max(1, len(baseline))
-        max_growth = self.config.max_prompt_growth
+        # Size-aware growth limit: small skills get more room to grow.
+        # Small skills (< 5KB) often need to add concrete details, file paths,
+        # examples, and operational context. Large skills (> 20KB) are already
+        # saturated and can't improve much anyway (GEPA ceiling).
+        baseline_size = len(baseline)
+        if baseline_size < 5_000:
+            max_growth = 1.0   # +100% — allow small skills room to add detail
+        elif baseline_size < 20_000:
+            max_growth = 0.5   # +50% — moderate room for medium skills
+        else:
+            max_growth = 0.2   # +20% — large skills are saturated
 
         if growth <= max_growth:
             return ConstraintResult(
