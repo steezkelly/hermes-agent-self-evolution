@@ -66,16 +66,10 @@ class StopDecision:
 class EvolutionReport:
     """Final output of a v2 evolution run."""
     skill_name: str
-    baseline_score: float
-    evolved_score: float
-    improvement: float
     n_iterations_executed: int
-    budget: ComputeBudget
-    router_decisions: list[RouterDecision] = field(default_factory=list)
-    selected_body: str = ""
-    selected_source: str = ""
-    robustness_passed: bool = False
-    backtrack_events: list[BacktrackDecision] = field(default_factory=list)
-    elapsed_seconds: float = 0.0
-    posthoc_analysis: str = ""
+    improvement: float
     recommendation: str = "review"
+    details: str = ""
+    router_decision: Optional[RouterDecision] = None
+    backtrack_decision: Optional[BacktrackDecision] = None
+    elapsed_seconds: float = 0.0

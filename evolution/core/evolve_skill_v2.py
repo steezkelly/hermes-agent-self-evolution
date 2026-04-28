@@ -95,12 +95,10 @@ class EvolutionRun:
             logger.info("Dry run — skipping GEPA compile and all LM calls")
             return EvolutionReport(
                 skill_name=self.skill_name,
-                baseline_score=baseline_score,
-                evolved_score=baseline_score,
-                improvement=0.0,
                 n_iterations_executed=0,
-                budget=budget,
+                improvement=0.0,
                 recommendation="review",
+                details=f"Dry run — {budget.max_iterations} iterations, {budget.total_metric_calls} metric calls",
                 elapsed_seconds=0.0,
             )
 
@@ -185,22 +183,16 @@ class EvolutionRun:
 
         return EvolutionReport(
             skill_name=self.skill_name,
-            baseline_score=baseline_score,
-            evolved_score=final_score,
-            improvement=improvement,
             n_iterations_executed=len(self.history) - 1,
-            budget=budget,
-            selected_body=self.history[-1].skill_body if self.history else baseline_body,
-            selected_source="evolved" if improvement > 0 else "baseline",
-            robustness_passed=True,
-            backtrack_events=self.backtrack_events,
-            elapsed_seconds=elapsed,
-            posthoc_analysis=self._build_posthoc_summary(),
+            improvement=improvement,
             recommendation=(
-                "deploy" if improvement > self.selector.min_improvement_delta
+                "deploy" if improvement > 0.03
                 else "review" if improvement > 0
                 else "reject"
             ),
+            details=f"baseline={baseline_score:.3f}, final={final_score:.3f}, "
+                    f"improvement={improvement:+.3f}, iterations={len(self.history) - 1}",
+            elapsed_seconds=elapsed,
         )
 
     def _run_router(self, body: str, score: float,

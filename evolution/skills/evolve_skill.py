@@ -424,20 +424,36 @@ def evolve(
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")
 @click.option("--stats-csv", default=None, help="Append run stats to a CSV file for analysis")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv):
+@click.option("--v2", is_flag=True, help="Use GEPA v2.1 pipeline (Router + robustness gates + backtrack)")
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv, v2):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
-    evolve(
-        skill_name=skill,
-        iterations=iterations,
-        eval_source=eval_source,
-        dataset_path=dataset_path,
-        optimizer_model=optimizer_model,
-        eval_model=eval_model,
-        hermes_repo=hermes_repo,
-        run_tests=run_tests,
-        dry_run=dry_run,
-        stats_csv=stats_csv,
-    )
+    if v2:
+        from evolution.core.gepa_v2_dispatch import v2_dispatch
+        v2_dispatch(
+            skill_name=skill,
+            iterations=iterations,
+            eval_source=eval_source,
+            dataset_path=dataset_path,
+            optimizer_model=optimizer_model,
+            eval_model=eval_model,
+            hermes_repo=hermes_repo,
+            run_tests=run_tests,
+            dry_run=dry_run,
+            stats_csv=stats_csv,
+        )
+    else:
+        evolve(
+            skill_name=skill,
+            iterations=iterations,
+            eval_source=eval_source,
+            dataset_path=dataset_path,
+            optimizer_model=optimizer_model,
+            eval_model=eval_model,
+            hermes_repo=hermes_repo,
+            run_tests=run_tests,
+            dry_run=dry_run,
+            stats_csv=stats_csv,
+        )
 
 
 if __name__ == "__main__":

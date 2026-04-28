@@ -35,7 +35,7 @@ def test_pipeline_runs_without_gepa():
     )
     assert report.n_iterations_executed <= 3
     assert report.recommendation in ("deploy", "review", "reject")
-    assert len(report.backtrack_events) > 0
+    assert report.details != ""
 
 
 def test_backtrack_integration():

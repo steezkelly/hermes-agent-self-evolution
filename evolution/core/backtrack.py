@@ -9,6 +9,7 @@ Human review required before retry. No auto-retry permitted.
 """
 
 from typing import Optional
+from datetime import datetime
 
 from evolution.core.types import EvolutionSnapshot, BacktrackDecision
 
@@ -42,9 +43,20 @@ class BacktrackController:
         self.checkpoints: list[EvolutionSnapshot] = []
         self.backtrack_count: int = 0
 
-    def checkpoint(self, state: EvolutionSnapshot):
-        """Save checkpoint. No trimming — needed for walk-back on backtrack."""
-        self.checkpoints.append(state)
+    def checkpoint(self, snapshot: EvolutionSnapshot) -> None:
+        """Record a checkpoint. Call after every iteration where score stabilized."""
+        self.checkpoints.append(snapshot)
+
+    def checkpoint_for_score(self, score: float, body: str, frontmatter: str, iteration: int) -> None:
+        """Convenience: record a checkpoint from raw score/body values."""
+        snapshot = EvolutionSnapshot(
+            iteration=iteration,
+            skill_body=body,
+            score=score,
+            variation_explanation="",
+            timestamp=datetime.now().isoformat(),
+        )
+        self.checkpoints.append(snapshot)
 
     def should_backtrack(self, current_score: float) -> BacktrackDecision:
         """Check plateau conditions against sliding window.
