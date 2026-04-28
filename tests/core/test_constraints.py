@@ -17,7 +17,7 @@ class TestSizeConstraints:
         assert result.passed
 
     def test_skill_over_limit(self, validator):
-        result = validator._check_size("x" * 20_000, "skill")
+        result = validator._check_size("x" * 60_000, "skill")
         assert not result.passed
         assert "exceeded" in result.message
 
@@ -38,8 +38,8 @@ class TestGrowthConstraints:
         assert result.passed
 
     def test_excessive_growth(self, validator):
-        baseline = "x" * 1000
-        evolved = "x" * 1300  # 30% growth
+        baseline = "x" * 25_000
+        evolved = "x" * 32_500  # 30% growth on 25KB skill (max 20% for >20KB skills)
         result = validator._check_growth(evolved, baseline, "skill")
         assert not result.passed
 
@@ -66,7 +66,7 @@ class TestNonEmpty:
 
 class TestSkillStructure:
     def test_valid_skill(self, validator):
-        skill = "---\nname: test-skill\ndescription: A test skill\n---\n\n# Test\nContent here"
+        skill = "---\nname: test-skill\ndescription: A test skill\n---\n\n# Test\n\nThis is a substantive test skill body with enough content to pass\nstructural validation. It describes a step-by-step procedure for\nprocessing requests and handling edge cases in the system.\n\n## Steps\n\n1. Validate the input parameters\n2. Process the request through the pipeline\n3. Return the result to the caller"
         result = validator._check_skill_structure(skill)
         assert result.passed
 

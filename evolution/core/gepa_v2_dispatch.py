@@ -25,7 +25,7 @@ from rich.panel import Panel
 
 from evolution.core.types import (
     RouterDecision, BacktrackDecision, ComputeBudget, EvolutionReport,
-    ScenarioResult, PostHocReport,
+    ScenarioResult,
 )
 from evolution.core.router import EvolutionRouter
 from evolution.core.backtrack import BacktrackController
