@@ -12,3 +12,4 @@ from evolution.core.constraints_v2 import (
     ConfigDriftChecker, SkillRegressionChecker, ScopeCreepChecker,
 )
 from evolution.core.evolve_skill_v2 import EvolutionRun
+from evolution.core.posthoc_analyzer import PostHocAnalyzer, PowerLawFit, PhaseResult, PostHocReport
