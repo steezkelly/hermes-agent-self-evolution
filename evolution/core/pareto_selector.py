@@ -19,6 +19,7 @@ class SelectionResult:
     holdout_score: float
     improvement_vs_baseline: float
     size_growth_ratio: float
+    reason: str = ""     # Human-readable explanation of the decision
 
 
 class ParetoSelector:
@@ -76,6 +77,7 @@ class ParetoSelector:
                 holdout_score=baseline_score,
                 improvement_vs_baseline=evolved_score - baseline_score,
                 size_growth_ratio=self._growth_ratio(baseline_body, evolved_body),
+                reason=f"Evolved failed robustness checks — retaining baseline (score={baseline_score:.3f})",
             )
 
         improvement = evolved_score - baseline_score
@@ -88,6 +90,7 @@ class ParetoSelector:
                 holdout_score=baseline_score,
                 improvement_vs_baseline=improvement,
                 size_growth_ratio=self._growth_ratio(baseline_body, evolved_body),
+                reason=f"Improvement {improvement:+.3f} below noise floor ({self.min_improvement_delta:.3f}) — retaining baseline",
             )
 
         growth_ratio = self._growth_ratio(baseline_body, evolved_body)
@@ -107,6 +110,9 @@ class ParetoSelector:
                 holdout_score=evolved_score,
                 improvement_vs_baseline=improvement,
                 size_growth_ratio=growth_ratio,
+                reason=(f"Evolved wins: weighted {evolved_weighted:.3f} vs {baseline_weighted:.3f} "
+                        f"(score {evolved_score:.3f} vs {baseline_score:.3f}, "
+                        f"growth {growth_ratio:.1%}, penalty {size_penalty:.2f})"),
             )
         else:
             return SelectionResult(
@@ -115,6 +121,9 @@ class ParetoSelector:
                 holdout_score=baseline_score,
                 improvement_vs_baseline=improvement,
                 size_growth_ratio=growth_ratio,
+                reason=(f"Baseline wins: weighted {baseline_weighted:.3f} vs {evolved_weighted:.3f} "
+                        f"(evolved score {evolved_score:.3f}, growth {growth_ratio:.1%}, "
+                        f"size penalty {size_penalty:.2f})"),
             )
 
     @staticmethod

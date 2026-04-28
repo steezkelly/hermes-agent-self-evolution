@@ -291,7 +291,7 @@ def v2_dispatch(
         })
 
         # ── 5e. Skill Regression Check ──────────────────────────────────
-        reg_ok, reg_msg = regression.check(avg_evolved, avg_baseline)
+        reg_ok, reg_msg = regression.check_score(avg_evolved, avg_baseline)
         if not reg_ok:
             console.print(f"[red]✗ Regression: {reg_msg}[/red] — rejecting evolved variant")
             # Checkpoint even for rejections (Backtrack needs the history)

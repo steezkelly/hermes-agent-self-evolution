@@ -121,6 +121,28 @@ class SkillRegressionChecker:
         # Future: implement actual scoring against each previous benchmark suite.
         return True, f"Found {len(previous_results)} previous benchmark files — regression checking requires full evaluation harness"
 
+    def check_score(self, evolved_score: float, baseline_score: float,
+                    threshold: Optional[float] = None) -> tuple[bool, str]:
+        """Inline score regression check — used by v2_dispatch.
+
+        Directly compares evolved score against baseline score without
+        scanning files on disk. Returns:
+            (True, "pass") if evolved >= baseline - threshold
+            (False, message) if regression detected
+        """
+        effective_threshold = threshold if threshold is not None else self.DEFAULT_THRESHOLD
+        regression = baseline_score - evolved_score
+        if regression > effective_threshold:
+            return (False,
+                    f"Regression: evolved {evolved_score:.3f} vs baseline {baseline_score:.3f} "
+                    f"(delta={regression:.3f}, max allowed={effective_threshold:.3f})")
+        if evolved_score >= baseline_score:
+            return (True,
+                    f"Pass: evolved {evolved_score:.3f} >= baseline {baseline_score:.3f} "
+                    f"(improvement {evolved_score - baseline_score:+.3f})")
+        return (True,
+                f"Minor regression within threshold: {regression:.3f} <= {effective_threshold:.3f}")
+
     @staticmethod
     def _find_previous_results(skill_dir: Path) -> list[Path]:
         """Find benchmark_results.json files in previous run directories."""
