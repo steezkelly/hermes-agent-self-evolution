@@ -25,7 +25,7 @@ from rich.panel import Panel
 
 from evolution.core.types import (
     RouterDecision, BacktrackDecision, ComputeBudget, EvolutionReport,
-    ScenarioResult,
+    ScenarioResult, PostHocReport,
 )
 from evolution.core.router import EvolutionRouter
 from evolution.core.backtrack import BacktrackController
@@ -35,6 +35,7 @@ from evolution.core.constraints_v2 import (
     SkillRegressionChecker,
     ScopeCreepChecker,
 )
+from evolution.core.posthoc_analyzer import PostHocAnalyzer
 from evolution.skills.evolve_skill import evolve as v1_evolve
 from evolution.skills.evolve_skill import (
     _extract_evolved_skill_body, reassemble_skill, find_skill,
@@ -190,6 +191,7 @@ def v2_dispatch(
     config_drift = ConfigDriftChecker()
     regression = SkillRegressionChecker()
     scope = ScopeCreepChecker()
+    posthoc = PostHocAnalyzer(min_improvement_delta=0.03)
 
     best_body = baseline_body
     best_score = 0.0  # Will be set after first evaluation
@@ -343,7 +345,18 @@ def v2_dispatch(
     overall_elapsed = time.time() - overall_start
     total_improvement = best_score - baseline_scores[0] if baseline_scores else 0.0
 
-    # ── 6. Router classification ────────────────────────────────────────
+    # ── 6. PostHoc Analysis ──────────────────────────────────────────────
+    # Extract score trajectory for power-law fitting
+    score_trajectory = [m["avg_baseline"] for m in run_metrics] if run_metrics else []
+    if best_score > 0 and (not score_trajectory or abs(score_trajectory[-1] - best_score) > 0.001):
+        score_trajectory.append(best_score)
+    posthoc_report = posthoc.analyze(score_trajectory) if len(score_trajectory) >= 2 else None
+    if posthoc_report:
+        console.print(f"\n[bold]PostHoc Analysis[/bold]")
+        console.print(f"  {posthoc_report.summary}")
+        console.print(f"  Action: {posthoc_report.recommended_action}")
+
+    # ── 7. Router classification ────────────────────────────────────────
     # Use best-body scenario results for Router classification
     router_decision = router.classify(
         skill_body=best_body,
@@ -352,7 +365,7 @@ def v2_dispatch(
         remaining_budget=0,
     )
 
-    # ── 7. Generate report ─────────────────────────────────────────────
+    # ── 8. Generate report ─────────────────────────────────────────────
     if total_improvement > 0.03:
         recommendation = "deploy"
     elif total_improvement > 0:
@@ -374,7 +387,7 @@ def v2_dispatch(
         backtrack_decision=BacktrackDecision(action="continue", rationale="done"),
     )
 
-    # ── 8. Save output ─────────────────────────────────────────────────
+    # ── 9. Save output ─────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = Path("output") / skill_name / f"v2_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -401,13 +414,14 @@ def v2_dispatch(
         "baseline_score": baseline_scores[0] if baseline_scores else 0,
         "elapsed_seconds": round(overall_elapsed, 1),
         "attempt_metrics": run_metrics,
+        "posthoc": posthoc.to_dict(posthoc_report) if posthoc_report else None,
     }
     (output_dir / "report.json").write_text(json.dumps(report_dict, indent=2))
 
     console.print(f"\n  Output saved to {output_dir}/")
     console.print()
 
-    # ── 9. Display summary table ──────────────────────────────────────
+    # ── 10. Display summary table ──────────────────────────────────────
     table = Table(title=f"v2.1 Results — {skill_name}")
     table.add_column("Metric", style="bold")
     table.add_column("Value", justify="right")
@@ -418,6 +432,9 @@ def v2_dispatch(
     table.add_row("Improvement", f"{total_improvement:+.3f}")
     table.add_row("Router Decision", f"{router_decision.action} ({router_decision.failure_pattern})")
     table.add_row("Router Confidence", f"{router_decision.confidence:.1%}")
+    if posthoc_report:
+        table.add_row("Phase", posthoc_report.phase.phase if posthoc_report.phase else "N/A")
+        table.add_row("Power-Law c", f"{posthoc_report.power_law.exponent_c:.4f}" if posthoc_report.power_law else "N/A")
     table.add_row("Elapsed", f"{overall_elapsed:.0f}s")
 
     console.print(table)
