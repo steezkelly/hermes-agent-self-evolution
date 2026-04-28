@@ -35,6 +35,7 @@ from rich.console import Console
 from rich.progress import Progress
 
 from evolution.core.dataset_builder import EvalExample, EvalDataset
+from evolution.core.nous_auth import _get_lm_kwargs
 
 console = Console()
 
@@ -444,7 +445,7 @@ class RelevanceFilter:
         scoring: str = dspy.OutputField(desc="JSON object with: relevant, expected_behavior, difficulty, category")
 
     def __init__(self, model: str):
-        self.scorer = dspy.ChainOfThought(self.ScoreRelevance)
+        self.scorer = dspy.Predict(self.ScoreRelevance)
         self.model = model
 
     def filter_and_score(
@@ -483,15 +484,17 @@ class RelevanceFilter:
             random.shuffle(remaining)
             candidates.extend(remaining[:max_examples * 2])
 
-        # Cap candidates to control LLM costs
-        candidates = candidates[:max_examples * 3]
+        # Cap pre-filter candidates to control LLM scoring time.
+        # At ~13-20s/call with minimax-m2.7, 20 candidates = ~5-7 min scoring.
+        candidates = candidates[:20]
 
         console.print(f"  Pre-filtered to {len(candidates)} candidates (from {len(messages)} total)")
 
         # Stage 2: LLM relevance scoring
         examples = []
         errors = 0
-        lm = dspy.LM(self.model, api_base=os.getenv("OPENROUTER_BASE_URL")) if os.getenv("OPENROUTER_BASE_URL") else dspy.LM(self.model)
+        lm_kwargs, model_used = _get_lm_kwargs(self.model)
+        lm = dspy.LM(model_used, **lm_kwargs)
 
         with Progress() as progress:
             task = progress.add_task("Scoring relevance...", total=len(candidates))

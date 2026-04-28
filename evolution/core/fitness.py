@@ -5,11 +5,11 @@ Supports length penalties and multi-dimensional scoring.
 """
 
 import dspy
-import os
 from dataclasses import dataclass
 from typing import Optional
 
 from evolution.core.config import EvolutionConfig
+from evolution.core.nous_auth import _get_lm_kwargs
 
 
 @dataclass
@@ -73,7 +73,8 @@ class LLMJudge:
     ) -> FitnessScore:
         """Score an agent output using LLM-as-judge."""
 
-        lm = dspy.LM(self.config.eval_model, api_base=os.getenv("OPENROUTER_BASE_URL")) if os.getenv("OPENROUTER_BASE_URL") else dspy.LM(self.config.eval_model)
+        lm_kwargs, eval_model_used = _get_lm_kwargs(self.config.eval_model)
+        lm = dspy.LM(eval_model_used, **lm_kwargs)
 
         with dspy.context(lm=lm):
             result = self.judge(

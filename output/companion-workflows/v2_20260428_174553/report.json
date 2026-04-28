@@ -1,0 +1,36 @@
+{
+  "skill_name": "companion-workflows",
+  "iterations_executed": 3,
+  "improvement": -0.025457714799820064,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.544 (baseline: 0.569)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.5437730544309491,
+  "baseline_score": 0.5692307692307692,
+  "elapsed_seconds": 968.7,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.5437730544309491,
+      "avg_evolved": 0.5728328834907781,
+      "improvement": 0.029059829059828957
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.5437730544309491,
+      "avg_evolved": 0.5437730544309491,
+      "improvement": 0.0
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.5437730544309491,
+      "avg_evolved": 0.5437730544309491,
+      "improvement": 0.0
+    }
+  ]
+}

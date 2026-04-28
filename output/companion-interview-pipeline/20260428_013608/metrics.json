@@ -1,0 +1,17 @@
+{
+  "skill_name": "companion-interview-pipeline",
+  "timestamp": "20260428_013608",
+  "iterations": 5,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "eval_model": "minimax/minimax-m2.7",
+  "baseline_score": 0.5808242288557927,
+  "evolved_score": 0.5526673785325148,
+  "improvement": -0.02815685032327786,
+  "baseline_size": 4243,
+  "evolved_size": 4949,
+  "train_examples": 14,
+  "val_examples": 7,
+  "holdout_examples": 7,
+  "elapsed_seconds": 289.5948238372803,
+  "constraints_passed": true
+}

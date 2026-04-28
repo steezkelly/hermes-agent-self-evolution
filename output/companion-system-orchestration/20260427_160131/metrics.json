@@ -1,0 +1,17 @@
+{
+  "skill_name": "companion-system-orchestration",
+  "timestamp": "20260427_160131",
+  "iterations": 5,
+  "optimizer_model": "openrouter/anthropic/claude-sonnet-4",
+  "eval_model": "openrouter/google/gemini-2.5-flash",
+  "baseline_score": 0.5734654234654235,
+  "evolved_score": 0.6152773892773892,
+  "improvement": 0.04181196581196567,
+  "baseline_size": 6974,
+  "evolved_size": 2240,
+  "train_examples": 10,
+  "val_examples": 5,
+  "holdout_examples": 5,
+  "elapsed_seconds": 199.045414686203,
+  "constraints_passed": true
+}

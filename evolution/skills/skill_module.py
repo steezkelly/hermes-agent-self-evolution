@@ -64,26 +64,32 @@ def find_skill(skill_name: str, hermes_agent_path: Path) -> Optional[Path]:
     """Find a skill by name in the hermes-agent skills directory.
 
     Searches recursively for a SKILL.md in a directory matching the skill name.
+    Falls back to ~/.hermes/skills/ if not found in the agent skills dir.
+    Uses Python's glob to work around rglob symlink limitations on 3.12+.
     """
-    skills_dir = hermes_agent_path / "skills"
-    if not skills_dir.exists():
+    def _search_in(skills_dir: Path) -> Optional[Path]:
+        if not skills_dir.exists():
+            return None
+        # glob instead of rglob to handle symlinks properly
+        for skill_md in list(skills_dir.glob("**/SKILL.md")):
+            if skill_md.parent.name == skill_name:
+                return skill_md
+        # Fuzzy match: check the name field in frontmatter
+        for skill_md in list(skills_dir.glob("**/SKILL.md")):
+            try:
+                content = skill_md.read_text()[:500]
+                if f"name: {skill_name}" in content or f'name: "{skill_name}"' in content:
+                    return skill_md
+            except Exception:
+                continue
         return None
 
-    # Direct match: skills/<category>/<skill_name>/SKILL.md
-    for skill_md in skills_dir.rglob("SKILL.md"):
-        if skill_md.parent.name == skill_name:
-            return skill_md
+    result = _search_in(hermes_agent_path / "skills")
+    if result:
+        return result
 
-    # Fuzzy match: check the name field in frontmatter
-    for skill_md in skills_dir.rglob("SKILL.md"):
-        try:
-            content = skill_md.read_text()[:500]
-            if f"name: {skill_name}" in content or f'name: "{skill_name}"' in content:
-                return skill_md
-        except Exception:
-            continue
-
-    return None
+    # Fallback to user skills directory
+    return _search_in(Path.home() / ".hermes" / "skills")
 
 
 class SkillModule(dspy.Module):

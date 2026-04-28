@@ -1,0 +1,17 @@
+{
+  "skill_name": "companion-personas",
+  "timestamp": "20260428_013008",
+  "iterations": 10,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "eval_model": "minimax/minimax-m2.7",
+  "baseline_score": 0.608,
+  "evolved_score": 0.608,
+  "improvement": 0.0,
+  "baseline_size": 15517,
+  "evolved_size": 15517,
+  "train_examples": 1,
+  "val_examples": 1,
+  "holdout_examples": 1,
+  "elapsed_seconds": 185.64014554023743,
+  "constraints_passed": true
+}

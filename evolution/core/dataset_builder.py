@@ -18,6 +18,7 @@ import dspy
 import os
 
 from evolution.core.config import EvolutionConfig
+from evolution.core.nous_auth import _get_lm_kwargs
 
 
 def _try_parse_json(text: str) -> list:
@@ -202,7 +203,9 @@ class SyntheticDatasetBuilder:
         n = num_cases or self.config.eval_dataset_size
 
         # Configure DSPy to use the judge model for generation
-        lm = dspy.LM(self.config.judge_model, api_base=os.getenv("OPENROUTER_BASE_URL")) if os.getenv("OPENROUTER_BASE_URL") else dspy.LM(self.config.judge_model)
+        lm_kwargs, judge_model_used = _get_lm_kwargs(self.config.judge_model)
+        lm_kwargs["num_retries"] = 8
+        lm = dspy.LM(judge_model_used, **lm_kwargs)
 
         with dspy.context(lm=lm):
             result = self.generator(

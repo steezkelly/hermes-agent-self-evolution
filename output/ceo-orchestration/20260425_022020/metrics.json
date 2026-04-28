@@ -1,0 +1,17 @@
+{
+  "skill_name": "ceo-orchestration",
+  "timestamp": "20260425_022020",
+  "iterations": 10,
+  "optimizer_model": "openrouter/anthropic/claude-sonnet-4",
+  "eval_model": "openrouter/google/gemini-2.5-flash",
+  "baseline_score": 0.5342784831733453,
+  "evolved_score": 0.6284040112944008,
+  "improvement": 0.09412552812105557,
+  "baseline_size": 4957,
+  "evolved_size": 4957,
+  "train_examples": 25,
+  "val_examples": 12,
+  "holdout_examples": 13,
+  "elapsed_seconds": 608.5633239746094,
+  "constraints_passed": true
+}
