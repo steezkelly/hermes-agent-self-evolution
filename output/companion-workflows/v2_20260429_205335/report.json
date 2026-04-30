@@ -1,0 +1,68 @@
+{
+  "skill_name": "companion-workflows",
+  "iterations_executed": 3,
+  "improvement": 0.0,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.707 (baseline: 0.689)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.7065656565656566,
+  "baseline_score": 0.6888888888888889,
+  "elapsed_seconds": 0.2,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.7065656565656566,
+      "avg_evolved": 0.7065656565656566,
+      "improvement": 0.0
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.7065656565656566,
+      "avg_evolved": 0.7065656565656566,
+      "improvement": 0.0
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.7065656565656566,
+      "avg_evolved": 0.7065656565656566,
+      "improvement": 0.0
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0,
+      "scale_a": 0.0087,
+      "offset_b": 0.6978,
+      "r_squared": 1.0,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "plateau",
+      "phase_confidence": 1.0,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.7065,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0
+    },
+    "raw_scores": [
+      0.7065656565656566,
+      0.7065656565656566,
+      0.7065656565656566,
+      0.7065656565656566
+    ],
+    "filtered_scores": [
+      0.7065656565656566,
+      0.7065656565656566,
+      0.7065656565656566,
+      0.7065656565656566
+    ],
+    "recommended_action": "stop",
+    "summary": "Analyzed 4 iterations: scores from 0.707 to 0.707 | Power-law fit: score = 0.0087 * iter^0.0 + 0.6978 (R\u00b2=1.0, converged) | Phase: plateau (confidence: 1.00) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "skill_name": "companion-memory-tiers",
+  "iterations_executed": 3,
+  "improvement": 0.12939758454106287,
+  "recommendation": "deploy",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.605 (baseline: 0.567)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 0.3,
+    "rationale": "Budget nearly exhausted, no clear pattern \u2014 extending by default"
+  },
+  "best_score": 0.6047642512077295,
+  "baseline_score": 0.5666666666666667,
+  "elapsed_seconds": 553.6,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.4753666666666666,
+      "avg_evolved": 0.6047642512077295,
+      "improvement": 0.12939758454106287
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.4753666666666666,
+      "avg_evolved": 0.6047642512077295,
+      "improvement": 0.12939758454106287
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.4753666666666666,
+      "avg_evolved": 0.6047642512077295,
+      "improvement": 0.12939758454106287
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.1631,
+      "scale_a": 0.5011,
+      "offset_b": 0.0,
+      "r_squared": 0.7492,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "diminishing_returns",
+      "phase_confidence": 0.4,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.7034,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0233
+    },
+    "raw_scores": [
+      0.4753666666666666,
+      0.6047642512077295,
+      0.6047642512077295,
+      0.6047642512077295
+    ],
+    "filtered_scores": [
+      0.4753666666666666,
+      0.6047642512077295,
+      0.6047642512077295,
+      0.6047642512077295
+    ],
+    "recommended_action": "wind_down",
+    "summary": "Analyzed 4 iterations: scores from 0.475 to 0.605 | Power-law fit: score = 0.5011 * iter^0.1631 + 0.0 (R\u00b2=0.7492, converged) | Phase: diminishing_returns (confidence: 0.40) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

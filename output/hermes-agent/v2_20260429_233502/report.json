@@ -1,0 +1,68 @@
+{
+  "skill_name": "hermes-agent",
+  "iterations_executed": 3,
+  "improvement": -0.004792902081903416,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.609 (baseline: 0.509)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "coverage",
+    "confidence": 0.8,
+    "rationale": "60%+ failures in same category (medium)"
+  },
+  "best_score": 0.6093279341111872,
+  "baseline_score": 0.5085106382978724,
+  "elapsed_seconds": 2470.3,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.6093279341111872,
+      "avg_evolved": 0.6045350320292838,
+      "improvement": -0.004792902081903416
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.6093279341111872,
+      "avg_evolved": 0.6045350320292838,
+      "improvement": -0.004792902081903416
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.6093279341111872,
+      "avg_evolved": 0.6045350320292838,
+      "improvement": -0.004792902081903416
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0,
+      "scale_a": 0.0088,
+      "offset_b": 0.6006,
+      "r_squared": 1.0,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "plateau",
+      "phase_confidence": 1.0,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.6094,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0
+    },
+    "raw_scores": [
+      0.6093279341111872,
+      0.6093279341111872,
+      0.6093279341111872,
+      0.6093279341111872
+    ],
+    "filtered_scores": [
+      0.6093279341111872,
+      0.6093279341111872,
+      0.6093279341111872,
+      0.6093279341111872
+    ],
+    "recommended_action": "stop",
+    "summary": "Analyzed 4 iterations: scores from 0.609 to 0.609 | Power-law fit: score = 0.0088 * iter^0.0 + 0.6006 (R\u00b2=1.0, converged) | Phase: plateau (confidence: 1.00) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

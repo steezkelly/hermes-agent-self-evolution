@@ -1,0 +1,65 @@
+{
+  "skill_name": "companion-memory-tiers",
+  "iterations_executed": 3,
+  "improvement": 0.0,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.141 (baseline: 0.313)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.14141120850137198,
+  "baseline_score": 0.3125051214727589,
+  "elapsed_seconds": 566.1,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.14141120850137198,
+      "avg_evolved": 0.14141120850137198
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.14141120850137198,
+      "avg_evolved": 0.14141120850137198
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.14141120850137198,
+      "avg_evolved": 0.14141120850137198
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0,
+      "scale_a": 0.0087,
+      "offset_b": 0.1327,
+      "r_squared": 0.9999,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "plateau",
+      "phase_confidence": 1.0,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.1414,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0
+    },
+    "raw_scores": [
+      0.14141120850137198,
+      0.14141120850137198,
+      0.14141120850137198,
+      0.14141120850137198
+    ],
+    "filtered_scores": [
+      0.14141120850137198,
+      0.14141120850137198,
+      0.14141120850137198,
+      0.14141120850137198
+    ],
+    "recommended_action": "stop",
+    "summary": "Analyzed 4 iterations: scores from 0.141 to 0.141 | Power-law fit: score = 0.0087 * iter^0.0 + 0.1327 (R\u00b2=0.9999, converged) | Phase: plateau (confidence: 1.00) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

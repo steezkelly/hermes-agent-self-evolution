@@ -1,0 +1,68 @@
+{
+  "skill_name": "ceo-orchestration",
+  "iterations_executed": 3,
+  "improvement": 0.026678321678321626,
+  "recommendation": "review",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.562 (baseline: 0.504)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.5623368298368299,
+  "baseline_score": 0.5041666666666667,
+  "elapsed_seconds": 3544.4,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.5623368298368299,
+      "avg_evolved": 0.5890151515151515,
+      "improvement": 0.026678321678321626
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.5623368298368299,
+      "avg_evolved": 0.5623368298368299,
+      "improvement": 0.0
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.5623368298368299,
+      "avg_evolved": 0.5623368298368299,
+      "improvement": 0.0
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0335,
+      "scale_a": 0.567,
+      "offset_b": 0.0,
+      "r_squared": 0.7709,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "plateau",
+      "phase_confidence": 0.5,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.6079,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0045
+    },
+    "raw_scores": [
+      0.5623368298368299,
+      0.5890151515151515,
+      0.5890151515151515,
+      0.5890151515151515
+    ],
+    "filtered_scores": [
+      0.5623368298368299,
+      0.5890151515151515,
+      0.5890151515151515,
+      0.5890151515151515
+    ],
+    "recommended_action": "stop",
+    "summary": "Analyzed 4 iterations: scores from 0.562 to 0.589 | Power-law fit: score = 0.567 * iter^0.0335 + 0.0 (R\u00b2=0.7709, converged) | Phase: plateau (confidence: 0.50) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}
