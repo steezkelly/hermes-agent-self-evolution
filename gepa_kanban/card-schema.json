@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GEPA Evolution Kanban Card",
+  "description": "One card per skill in the GEPA skill evolution pipeline. Card state is driven by run results, not manual updates.",
+  "type": "object",
+  "required": ["skill_name", "status", "priority", "run_count", "latest_run", "latest_delta", "best_delta", "updated_at"],
+  "properties": {
+    "skill_name": {
+      "type": "string",
+      "description": "Canonical skill name (matches SKILL.md filename)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["BACKLOG", "IN_PROGRESS", "REGRESSION", "VALIDATING", "DEPLOYED", "STALE"],
+      "description": "Current column on the kanban board"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Derived from |best_delta|: high ≥10%, medium ≥3%, else low"
+    },
+    "run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "regression_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latest_run": {
+      "type": ["string", "null"],
+      "description": "Most recent run_id (Ymd_HMS format), e.g. 20260428_014430"
+    },
+    "latest_run_path": {
+      "type": ["string", "null"],
+      "description": "Absolute path to the latest run's output directory"
+    },
+    "latest_baseline": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "latest_evolved": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "latest_delta": {
+      "type": "number",
+      "description": "improvement = evolved_score - baseline_score from the latest run"
+    },
+    "best_delta": {
+      "type": "number",
+      "description": "Highest improvement seen across all runs for this skill"
+    },
+    "best_run": {
+      "type": ["string", "null"],
+      "description": "run_id that achieved best_delta"
+    },
+    "eval_source": {
+      "type": "string",
+      "enum": ["synthetic", "sessiondb", "golden", "?"],
+      "description": "How the eval dataset was built"
+    },
+    "iterations": {
+      "type": "integer",
+      "description": "Iterations run in the latest run"
+    },
+    "constraints_passed": {
+      "type": "boolean",
+      "description": "Whether the evolved skill passed all constraint checks"
+    },
+    "is_multi_run": {
+      "type": "boolean",
+      "description": "True if more than one run exists for this skill"
+    },
+    "is_recent": {
+      "type": "boolean",
+      "description": "True if the latest run is within 24 hours of now"
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "description": "Wall-clock time of the latest run in seconds"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
