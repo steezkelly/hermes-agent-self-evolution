@@ -13,5 +13,7 @@
   "val_examples": 5,
   "holdout_examples": 5,
   "elapsed_seconds": 199.045414686203,
-  "constraints_passed": true
+  "constraints_passed": true,
+  "eval_source": "synthetic",
+  "optimizer_type": "GEPA"
 }

@@ -13,5 +13,7 @@
   "val_examples": 5,
   "holdout_examples": 5,
   "elapsed_seconds": 121.41262984275818,
-  "constraints_passed": true
+  "constraints_passed": true,
+  "eval_source": "sessiondb",
+  "optimizer_type": "GEPA"
 }
