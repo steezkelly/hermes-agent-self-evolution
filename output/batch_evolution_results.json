@@ -1,0 +1,42 @@
+[
+  {
+    "skill": "companion-roundtable",
+    "elapsed_seconds": 0.6262736320495605,
+    "recommendation": "reject",
+    "improvement": 0.0,
+    "router_action": "extend",
+    "router_failure": "noise",
+    "details": "v2.1 pipeline: 3 attempts, best score 0.782 (baseline: 0.865)",
+    "status": "success"
+  },
+  {
+    "skill": "companion-personas",
+    "elapsed_seconds": 0.4043271541595459,
+    "recommendation": "reject",
+    "improvement": 0.0,
+    "router_action": "extend",
+    "router_failure": "noise",
+    "details": "v2.1 pipeline: 3 attempts, best score 0.680 (baseline: 0.589)",
+    "status": "success"
+  },
+  {
+    "skill": "mnemosyne-maintenance",
+    "elapsed_seconds": 0.4526665210723877,
+    "recommendation": "reject",
+    "improvement": 0.0,
+    "router_action": "extend",
+    "router_failure": "noise",
+    "details": "v2.1 pipeline: 3 attempts, best score 0.767 (baseline: 0.757)",
+    "status": "success"
+  },
+  {
+    "skill": "companion-memory-tiers",
+    "elapsed_seconds": 144.38296508789062,
+    "recommendation": "reject",
+    "improvement": 0.0,
+    "router_action": "extend",
+    "router_failure": "noise",
+    "details": "v2.1 pipeline: 3 attempts, best score 0.690 (baseline: 0.684)",
+    "status": "success"
+  }
+]

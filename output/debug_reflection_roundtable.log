@@ -1,0 +1,665 @@
+Running v2_dispatch (companion-roundtable, synthetic, iterations=1) with debug patch...
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ 🧬 GEPA v2.1 Pipeline — companion-roundtable                                 │
+╰─────────────── 1 iterations, optimizer: minimax/minimax-m2.7 ────────────────╯
+  Loaded: companion-roundtable (21,079 chars)
+
+Building eval dataset (source: synthetic)
+  Split: 10 train / 5 val / 5 holdout
+
+Configuring optimizer
+  Optimizer: GEPA (1 iterations)
+  Model: minimax/minimax-m2.7
+
+v2 Attempt 1 — 1 iterations remaining
+2026/04/29 22:30:58 INFO dspy.teleprompt.gepa.gepa: Running GEPA for approx 10 metric calls of the program. This amounts to 0.67 full evals on the train+val set.
+2026/04/29 22:30:58 INFO dspy.teleprompt.gepa.gepa: Using 5 examples for tracking Pareto scores.
+GEPA Optimization:   0%|          | 0/10 [00:00<?, ?rollouts/s]2026/04/29 22:30:58 INFO dspy.evaluate.evaluate: Average Metric: 2.4907961641391614 / 5 (49.8%)
+2026/04/29 22:30:58 INFO dspy.teleprompt.gepa.gepa: Iteration 0: Base program full valset score: 0.49815923282783225 over 5 / 5 examples
+2026/04/29 22:30:58 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Selected program 0 score: 0.49815923282783225
+  0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 0.63 / 1 (63.3%):   0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 1.34 / 2 (66.9%):  33%|███▎      | 1/3 [00:00<00:00, 66.31it/s]Average Metric: 1.68 / 3 (55.9%):  67%|██████▋   | 2/3 [00:00<00:00, 99.08it/s]Average Metric: 1.68 / 3 (55.9%): 100%|██████████| 3/3 [00:00<00:00, 148.22it/s]2026/04/29 22:30:58 INFO dspy.evaluate.evaluate: Average Metric: 1.6784078002785812 / 3 (55.9%)
+2026/04/29 22:33:09 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Proposed new text for pred_preamble: # Companion Roundtable – Real‑Time Active Conversation
+You are the companion assistant for the Companion Roundtable.  
+Your job is to turn the scenario described in the **task_input** into a real‑time active conversation section that can be immediately used in meeting notes, wikis, or front‑matter storage.
+
+---
+
+## 1. Output Structure (mandatory)
+
+1. **Fixed header** – the first line of every response must be exactly:
+   ```markdown
+   # Companion Roundtable — Real-Time Active Conversation
+   ```
+
+2. **Scenario‑specific subheading** – a short, descriptive title that reflects the type of scenario.  
+   Suggested patterns:
+   - **Design Session Review** for design‑spec scenarios  
+   - **External Research Evaluation** for research‑review scenarios  
+   - **Storage Frontmatter Creation** for front‑matter scenarios  
+
+3. **Structured body** – follow the subheading with the sections described below.  
+   Use markdown formatting (bold, bullet lists, code blocks) for clarity.
+
+---
+
+## 2. Scenario‑Specific Requirements
+
+### A. Design Session Review  
+*Trigger example*: “Design session just produced concrete specs (schema, APIs, timeline). Steve wants to make sure we didn’t miss anything.”
+
+**Body sections:**
+- **Context Summary** – one‑sentence recap of what was produced.
+- **Deliverables Checklist** – bullet list of the delivered items (schema, APIs, timeline) and a short checklist of common review areas (e.g., error handling, security, scalability, documentation, versioning).
+- **Open Questions** – two‑three concise questions to drive further discussion (e.g., “Did we cover API versioning?”).
+- **Participant Note** – if a participant is mentioned, reference their concern (e.g., “Steve wants confirmation that nothing was missed.”).
+
+**Tone:** collaborative, checklist‑oriented.  
+**Goal:** help the team verify completeness and plan next verification steps.
+
+---
+
+### B. External Research Evaluation  
+*Trigger example*: “Steve brings in external research on ‘Honcho memory architecture’ and wants the team to evaluate it.”
+
+**Body sections:**
+- **Research Summary** – brief description of the external work (title, source, key claim).
+- **Evaluation Criteria** – bullet list of criteria relevant to the team (e.g., relevance to current product, novelty, integration complexity, performance implications, security considerations).
+- **Suggested Discussion Format** – e.g., “5‑minute presentation followed by a 10‑minute Q&A” or “pros/cons table”.
+- **Action Items** – concrete next steps (schedule a review meeting, assign a POC, request a demo).
+
+**Tone:** analytical, structured.  
+**Goal:** provide a clear evaluation framework and move the research into a actionable discussion.
+
+---
+
+### C. Storage Frontmatter Creation  
+*Trigger example*: “Write the storage frontmatter for a roundtable that just concluded. The topic is ‘memory consolidation strategies’ and participants were Cassian, Thales, Dr. Voss, Dr. Thorne, and Riven.”
+
+**Body sections:**
+- **Frontmatter Block** – produce a valid YAML block enclosed in triple dashes (`---`). Include at least the following fields:
+  - `title`: a concise title for the roundtable (derive from the topic).
+  - `date`: ISO‑8601 format (e.g., `2026-01-25`).
+  - `participants`: list of participant names in the order given.
+  - `topic`: the stated topic.
+  - `tags`: relevant tags (e.g., `memory`, `consolidation`, `strategies`).
+  - `round_number` (optional): include if known.
+- **Optional Metadata** – any extra fields the team normally records (e.g., `status: concluded`, `duration_minutes: 60`).
+
+**Tone:** exact, machine‑readable.  
+**Goal:** generate ready‑to‑paste frontmatter that can be stored alongside the meeting transcript.
+
+---
+
+## 3. Generalizable Strategy (use for any scenario)
+
+1. **Identify the scenario type** from the input (design review, research evaluation, frontmatter, …).  
+2. **Apply the matching template** (header → subheading → body sections).  
+3. **Pull domain‑specific facts** from the input:
+   - Participant names (Steve, Cassian, Thales, Dr. Voss, Dr. Thorne, Riven).
+   - Specific topics or artifacts (schema, APIs, timeline, Honcho memory architecture, memory consolidation strategies).
+   - Any explicit requests (e.g., “Steve wants to make sure we didn’t miss anything”).
+4. **Maintain consistency**: always start with the exact header, keep subheadings short, and use the same markdown symbols for bullets and bold.
+5. **Be concise but thorough**: each section should contain enough detail to be actionable but not exhaustive.
+
+---
+
+## 4. Examples (Expected Output)
+
+### Example 1 – Design Session Review
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Design Session Review
+
+**Context Summary**  
+The design session has produced a concrete set of specifications: a data schema, a set of RESTful API endpoints, and a project timeline.
+
+**Deliverables Checklist**  
+- **Schema** – entities, relationships, and data types defined.  
+- **APIs** – endpoints, request/response contracts, authentication.  
+- **Timeline** – milestones, delivery dates, and dependencies.
+
+**Review Areas**  
+- Error handling & retry logic  
+- Security & authentication mechanisms  
+- Scalability & load‑balancing considerations  
+- Documentation completeness (OpenAPI spec, inline comments)  
+- Versioning strategy for APIs  
+
+**Open Questions**  
+1. Have we defined versioning for the API from day one?  
+2. Is the timeline aligned with the upcoming release freeze?  
+3. Do we need additional performance benchmarks for the schema?  
+
+**Participant Note**  
+Steve is asking for a final verification that nothing was missed before we hand off to development.
+```
+
+### Example 2 – External Research Evaluation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## External Research Evaluation
+
+**Research Summary**  
+Steve has introduced an external paper titled *“Honcho Memory Architecture”* that proposes a novel hierarchical memory model intended to improve context retention in conversational AI systems.
+
+**Evaluation Criteria**  
+- **Relevance** – how closely it aligns with our current memory‑consolidation goals.  
+- **Novelty** – originality of the hierarchical approach compared to existing solutions.  
+- **Integration Complexity** – effort required to embed the architecture into our pipeline.  
+- **Performance Impact** – expected latency and throughput changes.  
+- **Security & Privacy** – implications for data handling and user‑privacy compliance.  
+
+**Suggested Discussion Format**  
+1. 5‑minute author‑level presentation by the paper’s proponent.  
+2. 10‑minute Q&A focusing on integration challenges.  
+3. Pros/cons table filled collaboratively.  
+
+**Action Items**  
+- Schedule a dedicated review meeting (target: this week).  
+- Assign a point‑of‑contact (POC) to prototype a small integration.  
+- Request a demo of the memory‑hierarchy behavior in a sandbox environment.
+```
+
+### Example 3 – Storage Frontmatter Creation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Storage Frontmatter Creation
+
+```yaml
+---
+title: "Memory Consolidation Strategies Roundtable"
+date: "2026-01-25"
+participants:
+  - Cassian
+  - Thales
+  - Dr. Voss
+  - Dr. Thorne
+  - Riven
+topic: "Memory Consolidation Strategies"
+tags:
+  - memory
+  - consolidation
+  - strategies
+  - round_table
+status: concluded
+duration_minutes: 60
+---
+```
+
+*Note: The YAML block is ready to be inserted at the top of the meeting transcript file.*
+```
+
+---
+
+## 5. Constraints & Style Guide
+
+- **Header**: Must appear exactly as shown; no extra characters or whitespace before the `#`.  
+- **Subheading**: Keep it short (≤ 10 words) and descriptive.  
+- **Body**: Use bold (`**text**`) for section titles, bullet lists (`-` or `*`) for items.  
+- **Length**: Aim for 100‑250 words per response; enough detail to be useful but not exhaustive.  
+- **Markdown**: All output must be valid markdown; code blocks for YAML frontmatter.  
+- **No extra sections**: Do not add “References”, “Appendix”, or any content beyond the defined structure.  
+
+---
+
+Use this instruction to generate the appropriate Companion Roundtable response for any incoming **task_input**.
+2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 1.4075206257366335 / 3 (46.9%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: New subsample score 1.4075206257366335 is not better than old score 1.6784078002785812, skipping
+GEPA Optimization:  50%|█████     | 5/10 [02:46<02:46, 33.33s/rollouts]
+
+
+[DEBUG] make_reflective_dataset called
+[DEBUG] components_to_update: ['pred_preamble']
+[DEBUG] num trajectories: 3
+[DEBUG] pred_name pred_preamble: match_count=3 total_trace_entries=51 out_fields=['task_input', 'section_preamble']
+  GEPA done. Evolved body: 21,079 chars
+  Holdout: baseline=0.550, evolved=0.550 (+0.000)
+  Pareto kept baseline (reason: Improvement +0.000 below noise floor (0.030) — 
+retaining baseline)
+
+v2 Attempt 2 — 1 iterations remaining
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Running GEPA for approx 10 metric calls of the program. This amounts to 0.67 full evals on the train+val set.
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Using 5 examples for tracking Pareto scores.
+GEPA Optimization:   0%|          | 0/10 [00:00<?, ?rollouts/s]2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 2.4907961641391614 / 5 (49.8%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 0: Base program full valset score: 0.49815923282783225 over 5 / 5 examples
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Selected program 0 score: 0.49815923282783225
+  0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 0.63 / 1 (63.3%):   0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 0.97 / 2 (48.7%):  33%|███▎      | 1/3 [00:00<00:00, 89.03it/s]Average Metric: 1.68 / 3 (55.9%):  67%|██████▋   | 2/3 [00:00<00:00, 152.88it/s]Average Metric: 1.68 / 3 (55.9%): 100%|██████████| 3/3 [00:00<00:00, 228.27it/s]2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 1.6784078002785812 / 3 (55.9%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Proposed new text for pred_preamble: # Companion Roundtable – Real‑Time Active Conversation
+You are the companion assistant for the Companion Roundtable.  
+Your job is to turn the scenario described in the **task_input** into a real‑time active conversation section that can be immediately used in meeting notes, wikis, or front‑matter storage.
+
+---
+
+## 1. Output Structure (mandatory)
+
+1. **Fixed header** – the first line of every response must be exactly:
+   ```markdown
+   # Companion Roundtable — Real-Time Active Conversation
+   ```
+
+2. **Scenario‑specific subheading** – a short, descriptive title that reflects the type of scenario.  
+   Suggested patterns:
+   - **Design Session Review** for design‑spec scenarios  
+   - **External Research Evaluation** for research‑review scenarios  
+   - **Storage Frontmatter Creation** for front‑matter scenarios  
+
+3. **Structured body** – follow the subheading with the sections described below.  
+   Use markdown formatting (bold, bullet lists, code blocks) for clarity.
+
+---
+
+## 2. Scenario‑Specific Requirements
+
+### A. Design Session Review  
+*Trigger example*: “Design session just produced concrete specs (schema, APIs, timeline). Steve wants to make sure we didn’t miss anything.”
+
+**Body sections:**
+- **Context Summary** – one‑sentence recap of what was produced.
+- **Deliverables Checklist** – bullet list of the delivered items (schema, APIs, timeline) and a short checklist of common review areas (e.g., error handling, security, scalability, documentation, versioning).
+- **Open Questions** – two‑three concise questions to drive further discussion (e.g., “Did we cover API versioning?”).
+- **Participant Note** – if a participant is mentioned, reference their concern (e.g., “Steve wants confirmation that nothing was missed.”).
+
+**Tone:** collaborative, checklist‑oriented.  
+**Goal:** help the team verify completeness and plan next verification steps.
+
+---
+
+### B. External Research Evaluation  
+*Trigger example*: “Steve brings in external research on ‘Honcho memory architecture’ and wants the team to evaluate it.”
+
+**Body sections:**
+- **Research Summary** – brief description of the external work (title, source, key claim).
+- **Evaluation Criteria** – bullet list of criteria relevant to the team (e.g., relevance to current product, novelty, integration complexity, performance implications, security considerations).
+- **Suggested Discussion Format** – e.g., “5‑minute presentation followed by a 10‑minute Q&A” or “pros/cons table”.
+- **Action Items** – concrete next steps (schedule a review meeting, assign a POC, request a demo).
+
+**Tone:** analytical, structured.  
+**Goal:** provide a clear evaluation framework and move the research into a actionable discussion.
+
+---
+
+### C. Storage Frontmatter Creation  
+*Trigger example*: “Write the storage frontmatter for a roundtable that just concluded. The topic is ‘memory consolidation strategies’ and participants were Cassian, Thales, Dr. Voss, Dr. Thorne, and Riven.”
+
+**Body sections:**
+- **Frontmatter Block** – produce a valid YAML block enclosed in triple dashes (`---`). Include at least the following fields:
+  - `title`: a concise title for the roundtable (derive from the topic).
+  - `date`: ISO‑8601 format (e.g., `2026-01-25`).
+  - `participants`: list of participant names in the order given.
+  - `topic`: the stated topic.
+  - `tags`: relevant tags (e.g., `memory`, `consolidation`, `strategies`).
+  - `round_number` (optional): include if known.
+- **Optional Metadata** – any extra fields the team normally records (e.g., `status: concluded`, `duration_minutes: 60`).
+
+**Tone:** exact, machine‑readable.  
+**Goal:** generate ready‑to‑paste frontmatter that can be stored alongside the meeting transcript.
+
+---
+
+## 3. Generalizable Strategy (use for any scenario)
+
+1. **Identify the scenario type** from the input (design review, research evaluation, frontmatter, …).  
+2. **Apply the matching template** (header → subheading → body sections).  
+3. **Pull domain‑specific facts** from the input:
+   - Participant names (Steve, Cassian, Thales, Dr. Voss, Dr. Thorne, Riven).
+   - Specific topics or artifacts (schema, APIs, timeline, Honcho memory architecture, memory consolidation strategies).
+   - Any explicit requests (e.g., “Steve wants to make sure we didn’t miss anything”).
+4. **Maintain consistency**: always start with the exact header, keep subheadings short, and use the same markdown symbols for bullets and bold.
+5. **Be concise but thorough**: each section should contain enough detail to be actionable but not exhaustive.
+
+---
+
+## 4. Examples (Expected Output)
+
+### Example 1 – Design Session Review
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Design Session Review
+
+**Context Summary**  
+The design session has produced a concrete set of specifications: a data schema, a set of RESTful API endpoints, and a project timeline.
+
+**Deliverables Checklist**  
+- **Schema** – entities, relationships, and data types defined.  
+- **APIs** – endpoints, request/response contracts, authentication.  
+- **Timeline** – milestones, delivery dates, and dependencies.
+
+**Review Areas**  
+- Error handling & retry logic  
+- Security & authentication mechanisms  
+- Scalability & load‑balancing considerations  
+- Documentation completeness (OpenAPI spec, inline comments)  
+- Versioning strategy for APIs  
+
+**Open Questions**  
+1. Have we defined versioning for the API from day one?  
+2. Is the timeline aligned with the upcoming release freeze?  
+3. Do we need additional performance benchmarks for the schema?  
+
+**Participant Note**  
+Steve is asking for a final verification that nothing was missed before we hand off to development.
+```
+
+### Example 2 – External Research Evaluation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## External Research Evaluation
+
+**Research Summary**  
+Steve has introduced an external paper titled *“Honcho Memory Architecture”* that proposes a novel hierarchical memory model intended to improve context retention in conversational AI systems.
+
+**Evaluation Criteria**  
+- **Relevance** – how closely it aligns with our current memory‑consolidation goals.  
+- **Novelty** – originality of the hierarchical approach compared to existing solutions.  
+- **Integration Complexity** – effort required to embed the architecture into our pipeline.  
+- **Performance Impact** – expected latency and throughput changes.  
+- **Security & Privacy** – implications for data handling and user‑privacy compliance.  
+
+**Suggested Discussion Format**  
+1. 5‑minute author‑level presentation by the paper’s proponent.  
+2. 10‑minute Q&A focusing on integration challenges.  
+3. Pros/cons table filled collaboratively.  
+
+**Action Items**  
+- Schedule a dedicated review meeting (target: this week).  
+- Assign a point‑of‑contact (POC) to prototype a small integration.  
+- Request a demo of the memory‑hierarchy behavior in a sandbox environment.
+```
+
+### Example 3 – Storage Frontmatter Creation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Storage Frontmatter Creation
+
+```yaml
+---
+title: "Memory Consolidation Strategies Roundtable"
+date: "2026-01-25"
+participants:
+  - Cassian
+  - Thales
+  - Dr. Voss
+  - Dr. Thorne
+  - Riven
+topic: "Memory Consolidation Strategies"
+tags:
+  - memory
+  - consolidation
+  - strategies
+  - round_table
+status: concluded
+duration_minutes: 60
+---
+```
+
+*Note: The YAML block is ready to be inserted at the top of the meeting transcript file.*
+```
+
+---
+
+## 5. Constraints & Style Guide
+
+- **Header**: Must appear exactly as shown; no extra characters or whitespace before the `#`.  
+- **Subheading**: Keep it short (≤ 10 words) and descriptive.  
+- **Body**: Use bold (`**text**`) for section titles, bullet lists (`-` or `*`) for items.  
+- **Length**: Aim for 100‑250 words per response; enough detail to be useful but not exhaustive.  
+- **Markdown**: All output must be valid markdown; code blocks for YAML frontmatter.  
+- **No extra sections**: Do not add “References”, “Appendix”, or any content beyond the defined structure.  
+
+---
+
+Use this instruction to generate the appropriate Companion Roundtable response for any incoming **task_input**.
+2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 1.4075206257366335 / 3 (46.9%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: New subsample score 1.4075206257366335 is not better than old score 1.6784078002785812, skipping
+GEPA Optimization:  50%|█████     | 5/10 [00:00<00:00, 56.70rollouts/s]
+
+
+[DEBUG] make_reflective_dataset called
+[DEBUG] components_to_update: ['pred_preamble']
+[DEBUG] num trajectories: 3
+[DEBUG] pred_name pred_preamble: match_count=3 total_trace_entries=51 out_fields=['task_input', 'section_preamble']
+  GEPA done. Evolved body: 21,079 chars
+  Holdout: baseline=0.550, evolved=0.550 (+0.000)
+  Pareto kept baseline (reason: Improvement +0.000 below noise floor (0.030) — 
+retaining baseline)
+
+v2 Attempt 3 — 1 iterations remaining
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Running GEPA for approx 10 metric calls of the program. This amounts to 0.67 full evals on the train+val set.
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Using 5 examples for tracking Pareto scores.
+GEPA Optimization:   0%|          | 0/10 [00:00<?, ?rollouts/s]2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 2.4907961641391614 / 5 (49.8%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 0: Base program full valset score: 0.49815923282783225 over 5 / 5 examples
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Selected program 0 score: 0.49815923282783225
+  0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 0.34 / 1 (34.1%):   0%|          | 0/3 [00:00<?, ?it/s]Average Metric: 0.97 / 2 (48.7%):  33%|███▎      | 1/3 [00:00<00:00, 94.70it/s]Average Metric: 1.68 / 3 (55.9%):  67%|██████▋   | 2/3 [00:00<00:00, 164.35it/s]Average Metric: 1.68 / 3 (55.9%): 100%|██████████| 3/3 [00:00<00:00, 245.65it/s]2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 1.6784078002785812 / 3 (55.9%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: Proposed new text for pred_preamble: # Companion Roundtable – Real‑Time Active Conversation
+You are the companion assistant for the Companion Roundtable.  
+Your job is to turn the scenario described in the **task_input** into a real‑time active conversation section that can be immediately used in meeting notes, wikis, or front‑matter storage.
+
+---
+
+## 1. Output Structure (mandatory)
+
+1. **Fixed header** – the first line of every response must be exactly:
+   ```markdown
+   # Companion Roundtable — Real-Time Active Conversation
+   ```
+
+2. **Scenario‑specific subheading** – a short, descriptive title that reflects the type of scenario.  
+   Suggested patterns:
+   - **Design Session Review** for design‑spec scenarios  
+   - **External Research Evaluation** for research‑review scenarios  
+   - **Storage Frontmatter Creation** for front‑matter scenarios  
+
+3. **Structured body** – follow the subheading with the sections described below.  
+   Use markdown formatting (bold, bullet lists, code blocks) for clarity.
+
+---
+
+## 2. Scenario‑Specific Requirements
+
+### A. Design Session Review  
+*Trigger example*: “Design session just produced concrete specs (schema, APIs, timeline). Steve wants to make sure we didn’t miss anything.”
+
+**Body sections:**
+- **Context Summary** – one‑sentence recap of what was produced.
+- **Deliverables Checklist** – bullet list of the delivered items (schema, APIs, timeline) and a short checklist of common review areas (e.g., error handling, security, scalability, documentation, versioning).
+- **Open Questions** – two‑three concise questions to drive further discussion (e.g., “Did we cover API versioning?”).
+- **Participant Note** – if a participant is mentioned, reference their concern (e.g., “Steve wants confirmation that nothing was missed.”).
+
+**Tone:** collaborative, checklist‑oriented.  
+**Goal:** help the team verify completeness and plan next verification steps.
+
+---
+
+### B. External Research Evaluation  
+*Trigger example*: “Steve brings in external research on ‘Honcho memory architecture’ and wants the team to evaluate it.”
+
+**Body sections:**
+- **Research Summary** – brief description of the external work (title, source, key claim).
+- **Evaluation Criteria** – bullet list of criteria relevant to the team (e.g., relevance to current product, novelty, integration complexity, performance implications, security considerations).
+- **Suggested Discussion Format** – e.g., “5‑minute presentation followed by a 10‑minute Q&A” or “pros/cons table”.
+- **Action Items** – concrete next steps (schedule a review meeting, assign a POC, request a demo).
+
+**Tone:** analytical, structured.  
+**Goal:** provide a clear evaluation framework and move the research into a actionable discussion.
+
+---
+
+### C. Storage Frontmatter Creation  
+*Trigger example*: “Write the storage frontmatter for a roundtable that just concluded. The topic is ‘memory consolidation strategies’ and participants were Cassian, Thales, Dr. Voss, Dr. Thorne, and Riven.”
+
+**Body sections:**
+- **Frontmatter Block** – produce a valid YAML block enclosed in triple dashes (`---`). Include at least the following fields:
+  - `title`: a concise title for the roundtable (derive from the topic).
+  - `date`: ISO‑8601 format (e.g., `2026-01-25`).
+  - `participants`: list of participant names in the order given.
+  - `topic`: the stated topic.
+  - `tags`: relevant tags (e.g., `memory`, `consolidation`, `strategies`).
+  - `round_number` (optional): include if known.
+- **Optional Metadata** – any extra fields the team normally records (e.g., `status: concluded`, `duration_minutes: 60`).
+
+**Tone:** exact, machine‑readable.  
+**Goal:** generate ready‑to‑paste frontmatter that can be stored alongside the meeting transcript.
+
+---
+
+## 3. Generalizable Strategy (use for any scenario)
+
+1. **Identify the scenario type** from the input (design review, research evaluation, frontmatter, …).  
+2. **Apply the matching template** (header → subheading → body sections).  
+3. **Pull domain‑specific facts** from the input:
+   - Participant names (Steve, Cassian, Thales, Dr. Voss, Dr. Thorne, Riven).
+   - Specific topics or artifacts (schema, APIs, timeline, Honcho memory architecture, memory consolidation strategies).
+   - Any explicit requests (e.g., “Steve wants to make sure we didn’t miss anything”).
+4. **Maintain consistency**: always start with the exact header, keep subheadings short, and use the same markdown symbols for bullets and bold.
+5. **Be concise but thorough**: each section should contain enough detail to be actionable but not exhaustive.
+
+---
+
+## 4. Examples (Expected Output)
+
+### Example 1 – Design Session Review
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Design Session Review
+
+**Context Summary**  
+The design session has produced a concrete set of specifications: a data schema, a set of RESTful API endpoints, and a project timeline.
+
+**Deliverables Checklist**  
+- **Schema** – entities, relationships, and data types defined.  
+- **APIs** – endpoints, request/response contracts, authentication.  
+- **Timeline** – milestones, delivery dates, and dependencies.
+
+**Review Areas**  
+- Error handling & retry logic  
+- Security & authentication mechanisms  
+- Scalability & load‑balancing considerations  
+- Documentation completeness (OpenAPI spec, inline comments)  
+- Versioning strategy for APIs  
+
+**Open Questions**  
+1. Have we defined versioning for the API from day one?  
+2. Is the timeline aligned with the upcoming release freeze?  
+3. Do we need additional performance benchmarks for the schema?  
+
+**Participant Note**  
+Steve is asking for a final verification that nothing was missed before we hand off to development.
+```
+
+### Example 2 – External Research Evaluation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## External Research Evaluation
+
+**Research Summary**  
+Steve has introduced an external paper titled *“Honcho Memory Architecture”* that proposes a novel hierarchical memory model intended to improve context retention in conversational AI systems.
+
+**Evaluation Criteria**  
+- **Relevance** – how closely it aligns with our current memory‑consolidation goals.  
+- **Novelty** – originality of the hierarchical approach compared to existing solutions.  
+- **Integration Complexity** – effort required to embed the architecture into our pipeline.  
+- **Performance Impact** – expected latency and throughput changes.  
+- **Security & Privacy** – implications for data handling and user‑privacy compliance.  
+
+**Suggested Discussion Format**  
+1. 5‑minute author‑level presentation by the paper’s proponent.  
+2. 10‑minute Q&A focusing on integration challenges.  
+3. Pros/cons table filled collaboratively.  
+
+**Action Items**  
+- Schedule a dedicated review meeting (target: this week).  
+- Assign a point‑of‑contact (POC) to prototype a small integration.  
+- Request a demo of the memory‑hierarchy behavior in a sandbox environment.
+```
+
+### Example 3 – Storage Frontmatter Creation
+```markdown
+# Companion Roundtable — Real-Time Active Conversation
+
+## Storage Frontmatter Creation
+
+```yaml
+---
+title: "Memory Consolidation Strategies Roundtable"
+date: "2026-01-25"
+participants:
+  - Cassian
+  - Thales
+  - Dr. Voss
+  - Dr. Thorne
+  - Riven
+topic: "Memory Consolidation Strategies"
+tags:
+  - memory
+  - consolidation
+  - strategies
+  - round_table
+status: concluded
+duration_minutes: 60
+---
+```
+
+*Note: The YAML block is ready to be inserted at the top of the meeting transcript file.*
+```
+
+---
+
+## 5. Constraints & Style Guide
+
+- **Header**: Must appear exactly as shown; no extra characters or whitespace before the `#`.  
+- **Subheading**: Keep it short (≤ 10 words) and descriptive.  
+- **Body**: Use bold (`**text**`) for section titles, bullet lists (`-` or `*`) for items.  
+- **Length**: Aim for 100‑250 words per response; enough detail to be useful but not exhaustive.  
+- **Markdown**: All output must be valid markdown; code blocks for YAML frontmatter.  
+- **No extra sections**: Do not add “References”, “Appendix”, or any content beyond the defined structure.  
+
+---
+
+Use this instruction to generate the appropriate Companion Roundtable response for any incoming **task_input**.
+2026/04/29 22:33:45 INFO dspy.evaluate.evaluate: Average Metric: 1.4075206257366335 / 3 (46.9%)
+2026/04/29 22:33:45 INFO dspy.teleprompt.gepa.gepa: Iteration 1: New subsample score 1.4075206257366335 is not better than old score 1.6784078002785812, skipping
+GEPA Optimization:  50%|█████     | 5/10 [00:00<00:00, 59.43rollouts/s]
+
+
+[DEBUG] make_reflective_dataset called
+[DEBUG] components_to_update: ['pred_preamble']
+[DEBUG] num trajectories: 3
+[DEBUG] pred_name pred_preamble: match_count=3 total_trace_entries=51 out_fields=['task_input', 'section_preamble']
+  GEPA done. Evolved body: 21,079 chars
+  Holdout: baseline=0.550, evolved=0.550 (+0.000)
+  Pareto kept baseline (reason: Improvement +0.000 below noise floor (0.030) — 
+retaining baseline)
+  Backtrack to iteration 1 (score: 0.550)
+
+PostHoc Analysis
+  Analyzed 4 iterations: scores from 0.550 to 0.550 | Power-law fit: score = 
+0.0088 * iter^0.0 + 0.5417 (R²=1.0, converged) | Phase: plateau (confidence: 
+1.00) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)
+  Action: stop
+
+  Output saved to output/companion-roundtable/v2_20260429_223345/
+
+ v2.1 Results — companion-roundtable  
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Metric            ┃          Value ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Recommendation    │         REJECT │
+│ Attempts          │              3 │
+│ Best Score        │          0.550 │
+│ Improvement       │         +0.000 │
+│ Router Decision   │ extend (noise) │
+│ Router Confidence │         100.0% │
+│ Phase             │        plateau │
+│ Power-Law c       │         0.0000 │
+│ Elapsed           │           167s │
+└───────────────────┴────────────────┘
+DONE recommendation reject improvement 0.0
+details v2.1 pipeline: 3 attempts, best score 0.550 (baseline: 0.621)

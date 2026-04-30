@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/tmp/kestrel_smoke_v2_small.py", line 1, in <module>
+    from evolution.core.gepa_v2_dispatch import v2_dispatch
+ModuleNotFoundError: No module named 'evolution'
