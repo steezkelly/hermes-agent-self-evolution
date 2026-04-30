@@ -51,6 +51,10 @@ class ConstraintValidator:
         if artifact_type == "skill":
             results.append(self._check_skill_structure(artifact_text))
 
+        # 5. CLI command validity (skills only — check hermes commands actually exist)
+        if artifact_type == "skill":
+            results.append(self._check_cli_syntax(artifact_text))
+
         return results
 
     def run_test_suite(self, hermes_repo: Path) -> ConstraintResult:
@@ -220,4 +224,138 @@ class ConstraintValidator:
             passed=False,
             constraint_name="skill_structure",
             message=f"Skill missing: {', '.join(missing)}",
+        )
+
+    def _check_cli_syntax(self, text: str) -> ConstraintResult:
+        """Check that hermes CLI commands and config keys in the skill body are real.
+
+        Hallucination failure mode: GEPA optimizes for keyword overlap against synthetic
+        examples. The evolved skill may teach command structures that look plausible but
+        contain fabricated config keys (e.g. 'hermes config set openrouter.model VALUE'
+        when the actual config has 'OpenRouter' as an API-key section, not a config key
+        namespace, and 'model' is the only top-level model key).
+
+        This constraint:
+        1. Parses the skill body for hermes CLI invocations in code blocks and inline text
+        2. Extracts config key paths (including dot-notation like 'model.provider')
+        3. Verifies each top-level key exists in live `hermes config show` output
+        4. Catches fabricated namespaces (openrouter.*, anthropic.*, etc.) that don't exist
+           as config key hierarchies
+        """
+        import re, subprocess
+
+        # ── 1. Get valid top-level config keys from live hermes config show ──────
+        config_show = subprocess.run(
+            ['hermes', 'config', 'show'],
+            capture_output=True, text=True, timeout=15,
+        )
+        valid_top_keys: set[str] = set()
+        if config_show.returncode == 0:
+            # Match lines like "  Model:        {...}" or "  Max turns:    150"
+            # and section headers like "◆ API Keys"
+            for m in re.finditer(r'^\s{2,}([a-z_][\w.]*):', config_show.stdout, re.MULTILINE):
+                valid_top_keys.add(m.group(1).lower())
+            for m in re.finditer(r'◆\s+([A-Z][A-Za-z\s/]+)', config_show.stdout, re.MULTILINE):
+                section = m.group(1).strip().lower().replace(' ', '_').replace('/', '_')
+                valid_top_keys.add(section)
+            # Also add common aliases
+            valid_top_keys.update({'model', 'provider', 'base_url', 'api_key',
+                                   'max_turns', 'timeout', 'backend'})
+
+        # ── 2. Parse hermes CLI commands from skill body ────────────────────────
+        # Extract ALL hermes command lines from code blocks and narrative text
+        all_lines = text.split('\n')
+        cmd_lines = []
+        in_code_block = False
+        for line in all_lines:
+            if line.strip().startswith('```'):
+                in_code_block = not in_code_block
+                continue
+            if 'hermes' in line.lower():
+                cmd_lines.append(line.strip())
+
+        # ── 3. Extract and validate config keys ─────────────────────────────────
+        # Pattern: hermes ... set KEY VALUE (with optional quotes)
+        key_val_pattern = re.compile(
+            r'hermes\s+\w[^|]*\sset\s+([\w.]+)\s+["\']?([\w:/\-.]+)',
+            re.IGNORECASE,
+        )
+        # Pattern: hermes ... set KEY (without value — just checking key existence)
+        key_only_pattern = re.compile(
+            r'hermes\s+\w[^|]*\sset\s+([\w.]+)(?:\s+["\']|$)',
+            re.IGNORECASE,
+        )
+
+        failures: list[str] = []
+        seen_failures: set[str] = set()
+
+        for line in cmd_lines:
+            # Extract config key paths from the line
+            for m in key_val_pattern.finditer(line):
+                key = m.group(1).lower()
+                parts = key.split('.')
+                top = parts[0]
+                if valid_top_keys and top not in valid_top_keys:
+                    if key not in seen_failures:
+                        failures.append(
+                            f"Skill body teaches non-existent config key '{key}' "
+                            f"(line: {line[:80]!r})"
+                        )
+                        seen_failures.add(key)
+
+        # ── 4. Validate subcommands exist ───────────────────────────────────────
+        # Only flag subcommands that appear to be CLI invocations:
+        # - In a code block (```bash, ```sh, ```)
+        # - On a line that looks like a shell command (starts with $ or contains `hermes`)
+        # - NOT narrative references like "hermes agent is..." or "hermes features"
+        hermes_help = subprocess.run(
+            ['hermes', '--help'],
+            capture_output=True, text=True, timeout=10,
+        )
+        valid_subcommands: set[str] = set()
+        if hermes_help.returncode == 0:
+            m = re.search(r'\{([^}]+)\}', hermes_help.stdout)
+            if m:
+                valid_subcommands = {s.strip() for s in m.group(1).split(',')}
+
+        in_code_block = False
+        subcmd_pattern = re.compile(r'hermes\s+(\w+)', re.IGNORECASE)
+        for line in all_lines:
+            if line.strip().startswith('```'):
+                in_code_block = not in_code_block
+                continue
+            # Only treat as CLI invocation if:
+            # (a) inside a code block, OR
+            # (b) line looks like a command (starts with $ or has `hermes` as command position)
+            is_code_context = in_code_block or line.strip().startswith('$')
+            has_hermes_cmd = bool(re.search(r'\$?\s*hermes\s+(\w+)', line, re.IGNORECASE))
+            if not (is_code_context and has_hermes_cmd):
+                continue
+            for m in subcmd_pattern.finditer(line):
+                sub = m.group(1).lower()
+                # These appear in narrative text about hermes, not as subcommands
+                if sub in {'agent', 'features', 'capabilities', 'feature', 'tool',
+                           'model', 'system', 'documentation', 'instructions', 'guide'}:
+                    continue
+                if sub not in ('config', 'set') and valid_subcommands and sub not in valid_subcommands:
+                    key = f"subcmd:{sub}"
+                    if key not in seen_failures:
+                        failures.append(
+                            f"Skill body teaches unknown hermes subcommand '{sub}'"
+                        )
+                        seen_failures.add(key)
+
+        if failures:
+            unique = list(dict.fromkeys(failures))[:5]
+            return ConstraintResult(
+                passed=False,
+                constraint_name="cli_syntax",
+                message=f"CLI hallucination risk: {'; '.join(unique)}",
+                details="\n".join(unique),
+            )
+
+        return ConstraintResult(
+            passed=True,
+            constraint_name="cli_syntax",
+            message="Skill CLI references are valid",
         )

@@ -47,6 +47,11 @@ class ToolDescriptionStore:
     # Maps tool_name -> original baseline description (never mutated)
     _baseline: Dict[str, str] = field(default_factory=dict)
 
+    def __post_init__(self):
+        # Initialize _baseline from descriptions if not already set
+        if not self._baseline and self.descriptions:
+            object.__setattr__(self, '_baseline', dict(self.descriptions))
+
     @classmethod
     def from_hermes_registry(cls, hermes_path: Optional[Path] = None) -> "ToolDescriptionStore":
         """Load current tool descriptions from the Hermes Agent registry."""
@@ -81,13 +86,15 @@ class ToolDescriptionStore:
         return len(self.descriptions)
 
     def to_json(self) -> str:
-        return json.dumps(self.descriptions, indent=2)
+        return json.dumps({"descriptions": self.descriptions, "_baseline": self._baseline}, indent=2)
 
     @classmethod
     def from_json(cls, data: str) -> "ToolDescriptionStore":
-        descriptions = json.loads(data)
+        obj = json.loads(data)
+        descriptions = obj.get("descriptions", {})
+        baseline = obj.get("_baseline", dict(descriptions))
         store = cls(descriptions=descriptions)
-        store._baseline = dict(descriptions)
+        store._baseline = dict(baseline)
         return store
 
 

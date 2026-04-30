@@ -38,9 +38,10 @@ from evolution.core.constraints_v2 import (
 from evolution.core.posthoc_analyzer import PostHocAnalyzer
 from evolution.skills.evolve_skill import evolve as v1_evolve
 from evolution.skills.evolve_skill import (
-    _extract_evolved_skill_body, reassemble_skill, find_skill,
-    SkillModule, load_skill,
+    multi_component_extract, reassemble_skill, find_skill,
+    load_skill, mcs_split,
 )
+from evolution.skills.skill_module_v2 import MultiComponentSkillModule
 from evolution.core.fitness import skill_fitness_metric
 from evolution.core.dataset_builder import (
     SyntheticDatasetBuilder, EvalDataset, GoldenDatasetLoader,
@@ -60,8 +61,8 @@ def v2_dispatch(
     iterations: int = 10,
     eval_source: str = "synthetic",
     dataset_path: Optional[str] = None,
-    optimizer_model: str = "openai/gpt-4.1",
-    eval_model: str = "openai/gpt-4.1-mini",
+    optimizer_model: str = "minimax/minimax-m2.7",
+    eval_model: str = "minimax/minimax-m2.7",
     hermes_repo: Optional[str] = None,
     run_tests: bool = False,
     dry_run: bool = False,
@@ -169,7 +170,7 @@ def v2_dispatch(
     if not all_pass:
         console.print("[yellow]⚠ Baseline has constraint violations — proceeding[/yellow]")
 
-    # ── 4. Setup DSPy + GEPA (same as v1) ─────────────────────────────
+    # ── 4. Setup DSPy + GEPA (multi-component with independently mutatable sections) ────
     console.print(f"\n[bold]Configuring optimizer[/bold]")
     console.print(f"  Optimizer: GEPA ({iterations} iterations)")
     console.print(f"  Model: {optimizer_model}")
@@ -179,7 +180,8 @@ def v2_dispatch(
     lm = dspy.LM(eval_model_used, **lm_kwargs)
     dspy.configure(lm=lm)
 
-    baseline_module = SkillModule(baseline_body)
+    sections = mcs_split(baseline_body)
+    baseline_module = MultiComponentSkillModule(baseline_body)
     trainset = dataset.to_dspy_examples("train")
     valset = dataset.to_dspy_examples("val")
 
@@ -215,9 +217,10 @@ def v2_dispatch(
                 metric=skill_fitness_metric,
                 max_metric_calls=max(remaining_budget * 10, 10),
                 reflection_lm=ref_lm,
+                component_selector="all",
             )
             optimized_module = optimizer.compile(
-                SkillModule(best_body),
+                MultiComponentSkillModule(best_body),
                 trainset=trainset,
                 valset=valset,
             )
@@ -230,14 +233,14 @@ def v2_dispatch(
                 num_threads=1,
             )
             optimized_module = optimizer.compile(
-                SkillModule(best_body),
+                MultiComponentSkillModule(best_body),
                 trainset=trainset,
                 valset=valset,
             )
             optimizer_type = "MIPROv2"
 
         # ── 5b. Extract evolved body ────────────────────────────────────
-        evolved_body = _extract_evolved_skill_body(optimized_module, best_body)
+        evolved_body = multi_component_extract(optimized_module, best_body, sections)
         if not evolved_body.strip():
             evolved_body = best_body
 
@@ -261,9 +264,8 @@ def v2_dispatch(
             with dspy.context(lm=lm):
                 baseline_pred = baseline_module(task_input=ex.task_input)
                 evolved_pred = optimized_module(task_input=ex.task_input)
-
-            b_score = skill_fitness_metric(ex, baseline_pred)
-            e_score = skill_fitness_metric(ex, evolved_pred)
+                b_score = skill_fitness_metric(ex, baseline_pred)
+                e_score = skill_fitness_metric(ex, evolved_pred)
             baseline_scores.append(b_score)
             evolved_scores.append(e_score)
 
@@ -343,7 +345,15 @@ def v2_dispatch(
                 break
 
     overall_elapsed = time.time() - overall_start
-    total_improvement = best_score - baseline_scores[0] if baseline_scores else 0.0
+    # Compute total_improvement as the MAXIMUM genuine holdout improvement across
+    # all attempts. This is conservative: it only credits actual improvement
+    # that generalized from train/val to the holdout set.
+    # NOTE: best_score (val-set) vs baseline_scores[0] (holdout) are different
+    # evaluation contexts — never compare them directly.
+    total_improvement = max(
+        (m["avg_evolved"] - m["avg_baseline"] for m in run_metrics),
+        default=0.0,
+    )
 
     # ── 6. PostHoc Analysis ──────────────────────────────────────────────
     # Extract score trajectory for power-law fitting

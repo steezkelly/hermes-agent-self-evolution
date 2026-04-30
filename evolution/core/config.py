@@ -18,9 +18,9 @@ class EvolutionConfig:
     population_size: int = 5
 
     # LLM configuration
-    optimizer_model: str = "openai/gpt-4.1"  # Model for GEPA reflections
-    eval_model: str = "openai/gpt-4.1-mini"  # Model for LLM-as-judge scoring
-    judge_model: str = "openai/gpt-4.1"  # Model for dataset generation
+    optimizer_model: str = "minimax/minimax-m2.7"  # Model for GEPA reflections
+    eval_model: str = "minimax/minimax-m2.7"  # Model for LLM-as-judge scoring
+    judge_model: str = "minimax/minimax-m2.7"  # Model for dataset generation
 
     # Constraints
     max_skill_size: int = 50_000  # 50KB default — evolved skills may include few-shot examples

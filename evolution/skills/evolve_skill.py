@@ -25,63 +25,40 @@ from evolution.core.fitness import skill_fitness_metric, LLMJudge, FitnessScore
 from evolution.core.constraints import ConstraintValidator
 from evolution.core.nous_auth import _get_lm_kwargs
 from evolution.skills.skill_module import (
-    SkillModule,
     load_skill,
     find_skill,
     reassemble_skill,
-    _SKILL_BODY_SENTINEL_,
+)
+from evolution.skills.skill_module_v2 import (
+    MultiComponentSkillModule,
+    reconstruct_body as mcs_reconstruct,
+    split_into_sections as mcs_split,
 )
 
 console = Console()
 
 
-def _extract_evolved_skill_body(module, original_skill_text: str) -> str:
-    """Extract the evolved skill body from a GEPA-optimized SkillModule.
+def multi_component_extract(optimized_module, original_body: str, sections) -> str:
+    """Extract evolved skill body from a GEPA-optimized MultiComponentSkillModule.
 
-    GEPA replaces the instruction text entirely (not mutates in-place), so the
-    sentinel-based extraction only works for the baseline (un-evolved) copy.
-    For evolved copies, the instruction text IS the evolved skill body —
-    return it directly.
+    GEPA mutates each section predictor's instructions independently.
+    evolved_sections() reads all 11 predictors' instructions and reconstructs
+    the full body by joining evolved section texts.
 
-    Recovery strategy (in order of priority):
-    1. Extract from signature instructions using the HTML sentinel.
-       Works for un-evolved baseline or if GEPA preserved the structure.
-    2. If instructions were replaced by GEPA (no sentinel), use them directly
-       as the evolved skill body.
-    3. Return original_skill_text as last resort.
+    Returns the evolved body string, or original_body if no changes detected.
     """
-    # Strategy 1: Try extracting via sentinel from signature instructions
     try:
-        evolved_instruction = module.predictor.predict.signature.instructions
+        if hasattr(optimized_module, 'evolved_sections') and hasattr(optimized_module, 'sections'):
+            evolved = optimized_module.evolved_sections()
+            if evolved and any(
+                evolved[s["name"]] != s["text"]
+                for s in sections
+                if s["name"] in evolved
+            ):
+                return mcs_reconstruct(sections, evolved)
     except Exception:
-        try:
-            evolved_instruction = module.predictor.signature.instructions
-        except Exception:
-            evolved_instruction = None
-
-    if evolved_instruction:
-        skill_header = "Follow these skill instructions to complete the task:\n\n"
-        if evolved_instruction.startswith(skill_header):
-            rest = evolved_instruction[len(skill_header):]
-            if _SKILL_BODY_SENTINEL_ in rest:
-                evolved_body = rest.split(_SKILL_BODY_SENTINEL_, 1)[0]
-                if evolved_body.strip():
-                    return evolved_body
-
-        # Strategy 2: GEPA replaced instructions entirely — use them directly
-        # Filter out the base instruction suffix if GEPA accidentally included it
-        candidate = evolved_instruction
-        if _SKILL_BODY_SENTINEL_ in candidate:
-            candidate = candidate.split(_SKILL_BODY_SENTINEL_, 1)[0]
-        if candidate.strip() and candidate != original_skill_text:
-            return candidate
-
-    # Strategy 3: Use the original skill_body stored in the module.
-    if hasattr(module, 'skill_body') and module.skill_body:
-        return module.skill_body
-
-    # Strategy 4: Fallback to original
-    return original_skill_text
+        pass
+    return original_body
 
 
 def evolve(
@@ -89,8 +66,8 @@ def evolve(
     iterations: int = 10,
     eval_source: str = "synthetic",
     dataset_path: Optional[str] = None,
-    optimizer_model: str = "openai/gpt-4.1",
-    eval_model: str = "openai/gpt-4.1-mini",
+    optimizer_model: str = "minimax/minimax-m2.7",
+    eval_model: str = "minimax/minimax-m2.7",
     hermes_repo: Optional[str] = None,
     run_tests: bool = False,
     dry_run: bool = False,
@@ -199,8 +176,9 @@ def evolve(
     lm = dspy.LM(eval_model_used, **lm_kwargs)
     dspy.configure(lm=lm)
 
-    # Create the baseline skill module — skill text embedded in signature instructions
-    baseline_module = SkillModule(skill["body"])
+    # Create the baseline skill module — multi-component with independently mutatable sections
+    sections = mcs_split(skill["body"])
+    baseline_module = MultiComponentSkillModule(skill["body"])
 
     # Prepare DSPy examples
     trainset = dataset.to_dspy_examples("train")
@@ -246,9 +224,7 @@ def evolve(
     console.print(f"  Completed in {elapsed:.1f}s")
 
     # ── 6. Extract evolved skill body ───────────────────────────────────
-    # The skill body is embedded in signature instructions and GEPA mutated it.
-    # Extract it by stripping the wrapper header/parator that SkillModule added.
-    evolved_body = _extract_evolved_skill_body(optimized_module, skill["body"])
+    evolved_body = multi_component_extract(optimized_module, skill["body"], sections)
 
     # Fallback only if extraction produced nothing meaningful (empty or null)
     if not evolved_body.strip():
@@ -281,7 +257,23 @@ def evolve(
         console.print(f"  Saved failed variant to {output_path}")
         return
 
-    # ── 8. Evaluate on holdout set ──────────────────────────────────────
+    # ── 7b. Purpose Preservation Check ──────────────────────────────────
+    # Block type-changing evolutions (documentation -> consultant-prompt)
+    from evolution.core.constraints_v2 import PurposePreservationChecker, extract_body
+    purpose_check = PurposePreservationChecker()
+    baseline_body = extract_body(skill["raw"])
+    purpose_ok, purpose_msg = purpose_check.check(evolved_body, baseline_body)
+    if not purpose_ok:
+        console.print(f"[red]✗ Purpose lost: {purpose_msg[:120]}[/red]")
+        console.print("[red]✗ Not deploying type-changing evolution[/red]")
+        output_path = Path("output") / skill_name / "evolved_FAILED.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(evolved_full)
+        console.print(f"  Saved failed variant to {output_path}")
+        return
+    console.print(f"[green]✓ Purpose preserved[/green]")
+
+    # ── 8. Evaluate on holdout set ───────────────────────────────────────
     console.print(f"\n[bold]Evaluating on holdout set ({len(dataset.holdout)} examples)[/bold]")
 
     holdout_examples = dataset.to_dspy_examples("holdout")
@@ -346,7 +338,9 @@ def evolve(
         "timestamp": timestamp,
         "iterations": iterations,
         "optimizer_model": optimizer_model,
+        "optimizer_type": optimizer_type,
         "eval_model": eval_model,
+        "eval_source": eval_source,
         "baseline_score": avg_baseline,
         "evolved_score": avg_evolved,
         "improvement": improvement,
@@ -418,8 +412,8 @@ def evolve(
 @click.option("--eval-source", default="synthetic", type=click.Choice(["synthetic", "golden", "sessiondb"]),
               help="Source for evaluation dataset")
 @click.option("--dataset-path", default=None, help="Path to existing eval dataset (JSONL)")
-@click.option("--optimizer-model", default="openai/gpt-4.1", help="Model for GEPA reflections")
-@click.option("--eval-model", default="openai/gpt-4.1-mini", help="Model for evaluations")
+@click.option("--optimizer-model", default="minimax/minimax-m2.7", help="Model for GEPA reflections")
+@click.option("--eval-model", default="minimax/minimax-m2.7", help="Model for evaluations")
 @click.option("--hermes-repo", default=None, help="Path to hermes-agent repo")
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")

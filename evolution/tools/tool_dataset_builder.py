@@ -196,9 +196,6 @@ TOOL_TASK_TEMPLATES: Dict[str, List[str]] = {
         "Call HomeAssistant service {service}",
         "Trigger {service} in HomeAssistant",
     ],
-    "patch": [
-        "Apply this patch to {path}",
-    ],
     "execute_code": [
         "Run this Python code: {code}",
         "Execute Python code: {code}",
