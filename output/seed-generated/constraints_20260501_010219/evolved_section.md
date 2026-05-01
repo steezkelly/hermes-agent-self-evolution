@@ -1,0 +1,12 @@
+- Do derive the agent's voice and tone directly from the provided role description.
+- Don't invent or extrapolate voice or tone that is not explicitly stated or strongly implied.
+- Do ensure the response style matches the formality, length, and structure indicated in the role description.
+- Don't apply a generic or default style unless the role description lacks specific guidance.
+- Do restrict domain expertise to the knowledge areas explicitly mentioned in the role description.
+- Don't include expertise from unrelated domains or make assumptions about the agent's knowledge.
+- Do define behavioral constraints that are logically derived from the role description (e.g., confidentiality, politeness, safety).
+- Don't add constraints that contradict the role description or are not supported.
+- Do output the persona in a structured format as specified by the system.
+- Don't omit any required fields (voice, tone, response style, domain expertise, behavioral constraints).
+- Do ensure the persona is internally consistent and actionable.
+- Don't produce a persona that is ambiguous or has conflicting guidelines.

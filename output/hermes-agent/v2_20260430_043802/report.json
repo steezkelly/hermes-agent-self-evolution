@@ -1,0 +1,68 @@
+{
+  "skill_name": "hermes-agent",
+  "iterations_executed": 3,
+  "improvement": 0.07904270480121867,
+  "recommendation": "deploy",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.690 (baseline: 0.657)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.6896972824217406,
+  "baseline_score": 0.6571428571428571,
+  "elapsed_seconds": 8788.7,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.6106545776205219,
+      "avg_evolved": 0.6896972824217406,
+      "improvement": 0.07904270480121867
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.6106545776205219,
+      "avg_evolved": 0.6709491866922208,
+      "improvement": 0.060294609071698924
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.6106545776205219,
+      "avg_evolved": 0.6746125116713352,
+      "improvement": 0.06395793405081329
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0858,
+      "scale_a": 0.6252,
+      "offset_b": 0.0,
+      "r_squared": 0.7623,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "diminishing_returns",
+      "phase_confidence": 0.571,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.7473,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0136
+    },
+    "raw_scores": [
+      0.6106545776205219,
+      0.6896972824217406,
+      0.6896972824217406,
+      0.6896972824217406
+    ],
+    "filtered_scores": [
+      0.6106545776205219,
+      0.6896972824217406,
+      0.6896972824217406,
+      0.6896972824217406
+    ],
+    "recommended_action": "wind_down",
+    "summary": "Analyzed 4 iterations: scores from 0.611 to 0.690 | Power-law fit: score = 0.6252 * iter^0.0858 + 0.0 (R\u00b2=0.7623, converged) | Phase: diminishing_returns (confidence: 0.57) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

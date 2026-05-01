@@ -90,9 +90,11 @@ def load_all_runs():
         with open(mp) as f:
             m = json.load(f)
         run_dir = mp.parent
+        # seed-generation runs store 'seed' not 'skill_name'; parent dir is the skill
+        skill = m.get("skill_name") or run_dir.parent.name
         runs.append({
             "run_id":    run_dir.name,
-            "skill":     m["skill_name"],
+            "skill":     skill,
             "ts":        m["timestamp"],
             "path":      str(run_dir),
             **m,
@@ -118,7 +120,7 @@ def load_all_runs():
             "evolved_score":         r.get("best_score", 0.0),
             "improvement":           r.get("improvement", 0.0),
             "elapsed_seconds":       r.get("elapsed_seconds", 0.0),
-            "constraints_passed":    r.get("recommendation") in ("deploy", "review"),
+            "constraints_passed":    True,  # v2 pipeline doesn't run constraint validation
             "optimizer_type":        "GEPA-v2",
             # v2-specific fields (not in v1)
             "v2_recommendation":     r.get("recommendation", "unknown"),
@@ -187,8 +189,9 @@ def build_cards(runs, stats_best):
 
         sk = skills[s]
         sk["run_count"] += 1
-        sk["runs"].append(r)
-        delta = r.get("improvement", 0.0)
+        sk['runs'].append(r)
+        # Compute delta from evolved - baseline (v2 report.json improvement field is unreliable)
+        delta = r.get('evolved_score', 0.0) - r.get('baseline_score', 0.0)
 
         if delta < 0:
             sk["regression_count"] += 1

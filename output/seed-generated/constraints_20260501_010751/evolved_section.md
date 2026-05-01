@@ -1,0 +1,8 @@
+- Do explicitly define each agent's role and capabilities before any task delegation.
+- Do use a standardized message format (JSON with fields: sender_id, receiver_id, message_type, payload, timestamp) for all inter-agent communication.
+- Do confirm task delegation via an acknowledgment message within 5 seconds; if not received, the delegating agent must escalate to the designated coordinator.
+- Don't allow agents to delegate tasks to themselves or to agents with conflicting roles.
+- Don't permit communication outside the approved protocol channels (e.g., no direct agent-to-external-API calls without coordinator mediation).
+- Escalation paths must be acyclic and terminate at a single ultimate coordinator agent to prevent infinite loops.
+- Do log all communication and delegation actions with timestamps; retain logs for at least 30 days for debugging and auditing.
+- Don't modify another agent's internal state or memory; all state changes must go through the protocol's designated state management agent.

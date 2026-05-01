@@ -1,49 +1,35 @@
-"""Run GEPA v2.1 evolution on companion-workflows skill.
-Invokes the evolve_skill.py --v2 entry point with appropriate models.
-"""
+#!/usr/bin/env python3
+"""GEPA v2.1 evolution run for github-code-review with verbose logging."""
 import sys
-import os
-import time
+print("=== Starting evolution run ===", flush=True)
+
+import time, json
 from pathlib import Path
 
-# Ensure the package is importable
 sys.path.insert(0, str(Path(__file__).parent))
+print("Path setup done", flush=True)
 
 from evolution.core.gepa_v2_dispatch import v2_dispatch
 from evolution.core.types import EvolutionReport
+print("Imports done", flush=True)
 
-SKILL = "companion-workflows"
-ITERATIONS = 5
-OPTIMIZER_MODEL = "minimax/minimax-m2.7"
-EVAL_MODEL = "minimax/minimax-m2.7"
-
-print(f"=" * 60)
-print(f"  GEPA v2.1 Evolution Run")
-print(f"  Skill: {SKILL}")
-print(f"  Iterations: {ITERATIONS}")
-print(f"  Optimizer: {OPTIMIZER_MODEL}")
-print(f"  Eval: {EVAL_MODEL}")
-print(f"=" * 60)
-print()
-
+print("Calling v2_dispatch...", flush=True)
 start = time.time()
-report: EvolutionReport = v2_dispatch(
-    skill_name=SKILL,
-    iterations=ITERATIONS,
+report = v2_dispatch(
+    skill_name="github-code-review",
+    iterations=10,
     eval_source="synthetic",
-    optimizer_model=OPTIMIZER_MODEL,
-    eval_model=EVAL_MODEL,
+    optimizer_model="minimax.minimax-m2.7",
+    eval_model="minimax.minimax-m2.7",
     run_tests=False,
     dry_run=False,
 )
 elapsed = time.time() - start
 
-print()
-print(f"  {'=' * 50}")
-print(f"  COMPLETE — {elapsed:.0f}s elapsed")
-print(f"  Skill: {report.skill_name}")
-print(f"  Recommendation: {report.recommendation}")
-print(f"  Improvement: {report.improvement:+.4f}")
-print(f"  Router: {report.router_decision.action} ({report.router_decision.failure_pattern})")
-print(f"  Details: {report.details}")
-print(f"  {'=' * 50}")
+print(f"\n{'='*50}", flush=True)
+print(f"  Elapsed: {elapsed:.0f}s", flush=True)
+print(f"  Improvement: {report.improvement:+.4f}", flush=True)
+print(f"  Recommendation: {report.recommendation}", flush=True)
+print(f"  Router: {report.router_decision.action} ({report.router_decision.failure_pattern})", flush=True)
+print(f"  Details: {report.details}", flush=True)
+print(f"{'='*50}", flush=True)

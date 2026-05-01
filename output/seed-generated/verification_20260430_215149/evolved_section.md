@@ -1,0 +1,2 @@
+- **Check 1: Relevance of Results.** Perform a search for a specific topic, e.g., "reinforcement learning". Pass if the first 5 returned papers have titles or abstracts that clearly relate to reinforcement learning. Fail if any of them are on unrelated topics.
+- **Check 2: Completeness of Metadata.** For the same search, inspect the metadata of the returned papers. Pass if each paper includes at least the title, authors, and publication date. Fail if any paper is missing these fields.

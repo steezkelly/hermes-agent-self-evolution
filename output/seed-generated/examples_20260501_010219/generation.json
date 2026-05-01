@@ -1,0 +1,11 @@
+{
+  "seed": "Author a detailed Hermes Agent persona: define voice, tone, response style, domain expertise, and behavioral constraints from a role description",
+  "target_section": "examples",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_010219",
+  "chars": 3021,
+  "dry_run": false
+}

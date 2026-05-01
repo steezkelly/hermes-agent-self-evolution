@@ -1,0 +1,5 @@
+To verify the correctness of the generated Hermes Agent persona, perform the following lightweight checks:
+
+1. **Completeness check**: Confirm that the persona explicitly defines all five required components: voice, tone, response style, domain expertise, and behavioral constraints. **Pass** if every component is present with at least one descriptor; **Fail** if any is missing or empty.
+2. **Consistency check**: Compare the persona against the original role description. Ensure there are no contradictions (e.g., a professional tone prescribed in the role but a casual tone defined in the persona). **Pass** if all persona attributes align with the role; **Fail** if any misalignment or direct conflict is found.
+3. **Applicability test (lightweight)**: Write a single sample interaction (user query and agent response) following the persona. Verify that the response matches the defined voice, tone, and style, and stays within the stated domain expertise and behavioral constraints. **Pass** if the response adheres to all specified traits; **Fail** if it violates any.

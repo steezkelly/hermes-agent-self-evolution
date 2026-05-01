@@ -21,7 +21,7 @@ from rich.table import Table
 from evolution.core.config import EvolutionConfig, get_hermes_agent_path
 from evolution.core.dataset_builder import SyntheticDatasetBuilder, EvalDataset, GoldenDatasetLoader
 from evolution.core.external_importers import build_dataset_from_external
-from evolution.core.fitness import skill_fitness_metric, LLMJudge, FitnessScore
+from evolution.core.fitness import skill_fitness_metric, fit_global_scorer, fit_embedding_scorer, LLMJudge, FitnessScore
 from evolution.core.constraints import ConstraintValidator
 from evolution.core.nous_auth import _get_lm_kwargs
 from evolution.skills.skill_module import (
@@ -184,6 +184,13 @@ def evolve(
     trainset = dataset.to_dspy_examples("train")
     valset = dataset.to_dspy_examples("val")
 
+    # Fit the TF-IDF scorer for semantic similarity evaluation
+    # This must run before GEPA optimization so the metric uses TF-IDF, not keyword overlap
+    fit_global_scorer(trainset + valset)       # TF-IDF fallback
+    fit_embedding_scorer(trainset + valset)    # primary: sentence embedding scorer
+    console.print("  ✓ Sentence embedding scorer fitted on train+val expected behaviors (primary)")
+    console.print("  ✓ TF-IDF scorer fitted as fallback")
+
     # ── 5. Run GEPA optimization ────────────────────────────────────────
     console.print(f"\n[bold cyan]Running GEPA optimization ({iterations} iterations)...[/bold cyan]\n")
 
@@ -191,11 +198,13 @@ def evolve(
 
     try:
         ref_lm_kwargs, optimizer_model_used = _get_lm_kwargs(optimizer_model)
+        ref_lm_kwargs["num_retries"] = 8
         ref_lm = dspy.LM(optimizer_model_used, **ref_lm_kwargs)
         # PR #35: use max_metric_calls (not max_full_evals); do NOT mix with auto="light"
         optimizer = dspy.GEPA(
             metric=skill_fitness_metric,
-            max_metric_calls=iterations * 10,  # metric calls budget
+            max_metric_calls=iterations * 20,  # metric calls budget (larger minibatch = more calls)
+            reflection_minibatch_size=15,  # evaluate each candidate on 15 examples for signal
             reflection_lm=ref_lm,
         )
 

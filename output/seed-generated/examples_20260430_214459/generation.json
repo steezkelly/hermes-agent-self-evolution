@@ -1,0 +1,11 @@
+{
+  "seed": "Search arXiv for papers matching a research topic",
+  "target_section": "examples",
+  "iterations": 1,
+  "optimizer_model": "deepseek-v4-pro",
+  "eval_model": "deepseek-v4-flash",
+  "n_examples": 1,
+  "timestamp": "20260430_214459",
+  "chars": 1139,
+  "dry_run": false
+}

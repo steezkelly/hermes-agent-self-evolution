@@ -217,7 +217,6 @@ def v2_dispatch(
                 metric=skill_fitness_metric,
                 max_metric_calls=max(remaining_budget * 10, 10),
                 reflection_lm=ref_lm,
-                component_selector="all",
             )
             optimized_module = optimizer.compile(
                 MultiComponentSkillModule(best_body),

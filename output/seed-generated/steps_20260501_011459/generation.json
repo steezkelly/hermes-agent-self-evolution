@@ -1,0 +1,11 @@
+{
+  "seed": "Review a GitHub pull request thoroughly: analyze the diff for bugs, security issues, performance problems, and write constructive inline comments via the GitHub API",
+  "target_section": "steps",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_011459",
+  "chars": 1782,
+  "dry_run": false
+}

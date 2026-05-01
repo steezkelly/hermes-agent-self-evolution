@@ -435,6 +435,7 @@ def generate_full_skill(
     """Generate a complete SKILL.md from a seed using parallel GEPA sections."""
 
     overall_start = time.time()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     console.print(
         Panel(
@@ -471,20 +472,14 @@ def generate_full_skill(
             proc = subprocess.Popen(
                 [
                     str(Path(__file__).parent.parent.parent / ".venv" / "bin" / "python"),
-                    "-m",
-                    "evolution.skills.seed_to_skill",
-                    "--seed",
-                    seed,
-                    "--target-section",
-                    section,
-                    "--iterations",
-                    str(iterations),
-                    "--optimizer-model",
-                    optimizer_model,
-                    "--eval-model",
-                    eval_model,
-                    "--n-examples",
-                    str(n_examples),
+                    "-m", "evolution.skills.seed_to_skill",
+                    "--seed", seed,
+                    "--target-section", section,
+                    "--iterations", str(iterations),
+                    "--optimizer-model", optimizer_model,
+                    "--eval-model", eval_model,
+                    "--n-examples", str(n_examples),
+                    "--timestamp", timestamp,
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -502,14 +497,14 @@ def generate_full_skill(
             # Completed.
             elapsed = 0.0
             try:
-                # We can't reliably compute start time after Popen; good enough.
-                elapsed = 0.0
                 stdout = proc.stdout.read() if proc.stdout else ""
             except Exception:
                 stdout = ""
 
-            matches = sorted(output_root.glob(f"{section}_*/evolved_section.md"))
-            content = matches[-1].read_text() if matches else ""
+            # Use exact timestamped dir so we don't accidentally read stale outputs.
+            out_dir = output_root / f"{section}_{timestamp}"
+            out_file = out_dir / "evolved_section.md"
+            content = out_file.read_text() if out_file.exists() else ""
 
             console.print(f"  [green]✓ {section}[/green] completed (exit={proc.returncode})")
 
@@ -609,8 +604,9 @@ def generate_full_skill(
 @click.option("--n-examples", default=5, type=int, show_default=True)
 @click.option("--max-concurrent", default=3, type=int, show_default=True)
 @click.option("--dry-run", is_flag=True, default=False)
+@click.option("--timestamp", default=None, type=str, help="Override timestamp for worker output dirs (used by orchestrator)")
 
-def cli(seed: str, full_skill: bool, target_section: Optional[str], iterations: int, optimizer_model: str, eval_model: str, n_examples: int, max_concurrent: int, dry_run: bool):
+def cli(seed: str, full_skill: bool, target_section: Optional[str], iterations: int, optimizer_model: str, eval_model: str, n_examples: int, max_concurrent: int, dry_run: bool, timestamp: Optional[str]):
     if full_skill:
         generate_full_skill(
             seed=seed,
@@ -629,9 +625,10 @@ def cli(seed: str, full_skill: bool, target_section: Optional[str], iterations: 
     if target_section not in SECTION_ORDER:
         raise click.UsageError(f"--target-section must be one of: {', '.join(SECTION_ORDER)}")
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Use orchestrator-provided timestamp so worker writes to the expected dir.
+    ts = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
     output_root = Path(__file__).parent.parent.parent / "output" / "seed-generated"
-    out_dir = output_root / f"{target_section}_{timestamp}"
+    out_dir = output_root / f"{target_section}_{ts}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     section_text = _generate_single_section(

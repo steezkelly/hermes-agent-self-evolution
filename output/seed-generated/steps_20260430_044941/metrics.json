@@ -1,0 +1,17 @@
+{
+  "seed": "Search arXiv for academic papers matching a research topic",
+  "target_section": "steps",
+  "iterations": 5,
+  "optimizer_type": "GEPA",
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "baseline_score": 0.0,
+  "evolved_score": 0.0,
+  "improvement": 0.0,
+  "train_examples": 3,
+  "val_examples": 1,
+  "holdout_examples": 2,
+  "evolved_instructions_chars": 3558,
+  "elapsed_seconds": 136.25828862190247,
+  "timestamp": "20260430_044941"
+}

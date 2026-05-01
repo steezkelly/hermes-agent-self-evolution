@@ -29,12 +29,12 @@ from evolution.core.nous_auth import _get_lm_kwargs
 def _invoke_skill_as_agent(body_text: str, task_input: str) -> str:
     """Execute the skill body as agent instructions + task to get a generated response.
 
-    This is the critical fix: instead of scoring the skill instructions
-    directly against the rubric, we first use them as an LLM prompt to
-    produce an actual task response, then score THAT response.
+    Uses the globally configured LM. Timeout/retry is handled at the LM level
+    (not via signal alarms, which break in threaded DSPy Evaluate contexts).
     """
     if not body_text.strip() or not task_input.strip():
         return body_text
+
     sig = dspy.Signature(
         "task_input: str -> response: str",
         instructions=body_text,
@@ -43,7 +43,7 @@ def _invoke_skill_as_agent(body_text: str, task_input: str) -> str:
         result = dspy.Predict(sig)(task_input=task_input)
         return result.response or ""
     except Exception:
-        return ""
+        return "[metric-inference-failed]"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -123,6 +123,107 @@ class TFIDFSimilarityScorer:
         output_vectors = self._vectorizer.transform(outputs)
         sims = cosine_similarity(output_vectors, self._expected_vectors)
         return [float(np.clip(s, 0.0, 1.0)) for s in sims.diagonal()]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sentence Embedding Semantic Similarity Scorer
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SentenceEmbeddingScorer:
+    """Semantic similarity via sentence transformer embeddings.
+
+    Pre-computes embeddings for all expected_behaviors using a local
+    sentence transformer model (all-MiniLM-L6-v2). At scoring time,
+    the agent output is embedded on-the-fly (~5ms) and compared via
+    cosine similarity against the pre-computed expected behavior vector.
+
+    Unlike TF-IDF, this captures semantic equivalence even when the
+    LLM uses entirely different vocabulary than the expected behavior:
+      "You can only have one provider active"  vs
+      "MemoryManager rejects registration of a second external provider"
+      → TF-IDF: 0.000     SentenceEmbedding: 0.648
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        self._model = None
+        self._model_name = model_name
+        self._expected_embeddings: dict[str, np.ndarray] = {}  # text → vector
+        self._fitted: bool = False
+
+    def fit(self, examples: list[dspy.Example]) -> "SentenceEmbeddingScorer":
+        """Pre-compute embeddings for all expected_behavior texts.
+
+        Call once per skill/dataset (not per evaluation).
+        Lazy-loads the sentence transformer model on first call.
+        """
+        from sentence_transformers import SentenceTransformer
+
+        texts = [
+            getattr(ex, "expected_behavior", "") or ""
+            for ex in examples
+            if (getattr(ex, "expected_behavior", "") or "").strip()
+        ]
+        if not texts:
+            self._fitted = False
+            return self
+
+        self._model = SentenceTransformer(self._model_name)
+        vectors = self._model.encode(texts, show_progress_bar=False)
+        self._expected_embeddings = dict(zip(texts, vectors))
+        self._fitted = True
+        return self
+
+    def score(self, agent_output: str, expected_behavior: str) -> float:
+        """Score an agent output against its expected behavior.
+
+        Returns cosine similarity (0-1) between the two sentence embeddings.
+        1.0 = semantically identical. 0.0 = completely unrelated topics.
+        """
+        if not self._fitted or not agent_output.strip():
+            return 0.5  # Neutral default
+
+        if expected_behavior not in self._expected_embeddings:
+            return 0.5
+
+        expected_vec = self._expected_embeddings[expected_behavior]
+        # Encode on-the-fly — ~5ms per call via sentence_transformers
+        output_vec = self._model.encode(agent_output, show_progress_bar=False)
+
+        sim = float(np.dot(output_vec, expected_vec) /
+                    (np.linalg.norm(output_vec) * np.linalg.norm(expected_vec)))
+        return float(np.clip(sim, 0.0, 1.0))
+
+    def score_batch(
+        self,
+        agent_outputs: list[str],
+        expected_behaviors: list[str],
+    ) -> list[float]:
+        """Score multiple outputs in a batch.
+
+        More efficient than calling score() in a loop when the model
+        can batch-encode the agent outputs.
+        """
+        if not self._fitted:
+            return [0.5] * len(agent_outputs)
+
+        # Filter to only those with known expected behaviors
+        valid_idxs = [
+            i for i, eb in enumerate(expected_behaviors)
+            if eb in self._expected_embeddings
+        ]
+        if not valid_idxs:
+            return [0.5] * len(agent_outputs)
+
+        valid_outputs = [agent_outputs[i] for i in valid_idxs]
+        output_vectors = self._model.encode(valid_outputs, show_progress_bar=False)
+
+        scores = [0.5] * len(agent_outputs)
+        for idx, vec in zip(valid_idxs, output_vectors):
+            expected_vec = self._expected_embeddings[expected_behaviors[idx]]
+            sim = float(np.dot(vec, expected_vec) /
+                        (np.linalg.norm(vec) * np.linalg.norm(expected_vec)))
+            scores[idx] = float(np.clip(sim, 0.0, 1.0))
+        return scores
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -287,9 +388,9 @@ class LLMJudge:
 
         os.environ["OPENAI_API_KEY"] = api_key
 
-        # Strip provider prefix for litellm routing
+        # Strip provider prefix for litellm routing — INCLUDING minimax
         bare_model = model
-        if "/" in bare_model and not bare_model.startswith("minimax/"):
+        if "/" in bare_model:
             bare_model = bare_model.split("/", 1)[-1]
 
         kwargs = {
@@ -299,27 +400,90 @@ class LLMJudge:
         return kwargs, bare_model
 
 
+def _generate_feedback(
+    agent_output: str,
+    expected: str,
+    task: str,
+    pred_name: str,
+    raw_output: str,
+) -> str:
+    """Generate diagnostic feedback text for GEPA reflective mutation.
+
+    Compares the agent's actual output against the expected behavior to
+    produce actionable feedback about what went wrong and why.
+    """
+    if not agent_output.strip():
+        return (
+            f"The predictor '{pred_name}' produced an empty output for "
+            f"task: '{task[:120]}'. Expected: '{expected[:200]}'. "
+            "The skill instructions may need to guide the model to produce "
+            "a substantive response even for short queries."
+        )
+
+    expected_lower = expected.lower()
+    output_lower = agent_output.lower()
+    expected_words = set(expected_lower.split())
+    output_words = set(output_lower.split())
+
+    # Check for missing key terms
+    missing = expected_words - output_words
+    present = expected_words & output_words
+
+    parts = []
+    if len(agent_output) < 50:
+        parts.append("The response was very short and likely incomplete.")
+
+    if len(missing) > 3 and len(present) / max(len(expected_words), 1) < 0.3:
+        parts.append(
+            "The response missed most of the expected content — it discussed "
+            "different topics than what was asked."
+        )
+    elif len(missing) > len(present):
+        parts.append(
+            "The response covered some of the expected ground but omitted "
+            f"key terms like: {', '.join(sorted(missing)[:8])}."
+        )
+    elif missing:
+        parts.append(
+            f"Good direction, but missed specific details like: "
+            f"{', '.join(sorted(missing)[:6])}."
+        )
+    else:
+        parts.append("Response matches the expected content well.")
+
+    # Check output length relative to the skill body
+    if len(raw_output) > 500 and raw_output.count("## ") >= 2:
+        # This was a skill body that got invoked — the agent_output is the
+        # LLM's response after reading the skill text as instructions
+        if not any(w in output_lower for w in ["hermes", "command", "run", "config", "skill"]):
+            parts.append(
+                "The response lacked concrete Hermes CLI commands or references, "
+                "suggesting the skill instructions didn't guide the model to produce "
+                "specific, actionable outputs."
+            )
+
+    return " | ".join(parts) if parts else (
+        f"Score reflects semantic similarity. Task: '{task[:100]}'."
+    )
+
+
 def skill_fitness_metric(
     example: dspy.Example,
     prediction: dspy.Prediction,
     trace=None,
     pred_name=None,
     pred_trace=None,
-) -> float:
+) -> float | dict:
     """DSPy-compatible metric function for skill optimization.
 
     Accepts 5 args for GEPA compatibility: (gold, pred, trace, pred_name, pred_trace).
-    Returns a float 0-1 score.
-
-    CRITICAL FIX (v2): The metric now invokes an LLM with the skill body as
-    system instructions + the task_input, producing a real agent response that
-    gets scored against expected_behavior. This replaces the broken V2 behavior
-    where the metric scored raw 21KB skill body text (naturally high keyword
-    overlap → flat signal → GEPA could not optimize).
+    When pred_name is provided (GEPA requesting predictor-level feedback), returns
+    a dict {'score': float, 'feedback': str} with diagnostic feedback text.
+    When pred_name is None (normal evaluation), returns a bare float.
 
     The heuristic: if prediction.output looks like a skill body (contains
     markdown headings and is >1500 chars), we invoke the LLM first. Otherwise
-    we score the output directly (for backward compat with simple responses).
+    we score the output directly.
     """
     # The prediction should have an 'output' field with the agent's response
     raw_output = getattr(prediction, "output", "") or ""
@@ -343,21 +507,36 @@ def skill_fitness_metric(
     if not agent_output.strip():
         return 0.0
 
-    # Use the global TF-IDF scorer if it has been fitted
-    if _global_scorer is not None and _global_scorer._fitted:
-        return _global_scorer.score(agent_output, expected)
+    # Compute score
+    if _embed_scorer is not None and _embed_scorer._fitted:
+        score = _embed_scorer.score(agent_output, expected)
+    elif _global_scorer is not None and _global_scorer._fitted:
+        score = _global_scorer.score(agent_output, expected)
+    else:
+        score = 0.5
+        expected_lower = expected.lower()
+        output_lower = agent_output.lower()
+        expected_words = set(expected_lower.split())
+        output_words = set(output_lower.split())
+        if expected_words:
+            overlap = len(expected_words & output_words) / len(expected_words)
+            score = 0.3 + (0.7 * overlap)
 
-    # Fallback: simple keyword overlap (original behavior)
-    score = 0.5  # Base score for non-empty output
-    expected_lower = expected.lower()
-    output_lower = agent_output.lower()
-    expected_words = set(expected_lower.split())
-    output_words = set(output_lower.split())
-    if expected_words:
-        overlap = len(expected_words & output_words) / len(expected_words)
-        score = 0.3 + (0.7 * overlap)
+    score = min(1.0, max(0.0, score))
 
-    return min(1.0, max(0.0, score))
+    # When GEPA asks for predictor-level feedback (pred_name is set),
+    # return dict with diagnostic feedback text for the reflection LM.
+    if pred_name is not None:
+        feedback = _generate_feedback(
+            agent_output=agent_output,
+            expected=expected,
+            task=task,
+            pred_name=pred_name,
+            raw_output=raw_output,
+        )
+        return {"score": score, "feedback": feedback}
+
+    return score
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -384,9 +563,32 @@ def fit_global_scorer(examples: list[dspy.Example]) -> TFIDFSimilarityScorer:
 
 
 def clear_global_scorer() -> None:
-    """Reset the global scorer. Call between different skills."""
-    global _global_scorer
+    """Reset both global scorers. Call between different skills."""
+    global _global_scorer, _embed_scorer
     _global_scorer = None
+    _embed_scorer = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Global Sentence Embedding scorer — fitted once per skill/dataset
+# ─────────────────────────────────────────────────────────────────────────────
+
+_embed_scorer: Optional[SentenceEmbeddingScorer] = None
+
+
+def fit_embedding_scorer(examples: list[dspy.Example]) -> SentenceEmbeddingScorer:
+    """Fit the global sentence embedding scorer on evaluation examples.
+
+    Pre-computes embeddings for all expected_behavior texts using a local
+    sentence transformer model. Call this ONCE before starting GEPA optimization.
+
+    After fitting, skill_fitness_metric will use sentence embedding cosine
+    similarity as the primary scoring method (semantic-aware).
+    """
+    global _embed_scorer
+    _embed_scorer = SentenceEmbeddingScorer()
+    _embed_scorer.fit(examples)
+    return _embed_scorer
 
 
 def _parse_score(value) -> float:

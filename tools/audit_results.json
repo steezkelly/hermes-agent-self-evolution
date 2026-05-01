@@ -3,118 +3,108 @@
     "skill": "ceo-orchestration",
     "splits": {
       "train.jsonl": {
-        "count": 25,
-        "file_size_bytes": 42108
+        "count": 10,
+        "file_size_bytes": 3413
       },
       "val.jsonl": {
-        "count": 12,
-        "file_size_bytes": 14949
+        "count": 5,
+        "file_size_bytes": 1836
       },
       "holdout.jsonl": {
-        "count": 13,
-        "file_size_bytes": 20003
+        "count": 5,
+        "file_size_bytes": 1666
       }
     },
     "difficulty_dist": {
-      "easy": 19,
-      "medium": 22,
-      "hard": 9
+      "easy": 5,
+      "medium": 10,
+      "hard": 5
     },
     "categories": {
-      "skill invocation/management": 3,
-      "goal_interpretation": 4,
-      "Strategic Planning and Assessment": 1,
-      "implementation": 4,
-      "Strategic Planning & Role Definition": 1,
-      "Skill Integration/System Architecture": 2,
-      "wiki interaction and state management": 1,
-      "Strategic Planning & Execution": 2,
-      "Multi-agent operational detail / Orchestration parameters": 2,
-      "Multi-agent orchestration and strategic planning": 2,
-      "Strategic Planning/Skill Activation": 1,
-      "Information Gathering and Verification": 2,
-      "Strategic Planning / Document Generation": 1,
-      "system_architecture_information_retrieval": 1,
-      "Strategic Planning and Multi-Agent Architecture Design": 1,
-      "clarification_and_meta_discussion": 1,
-      "Strategic Planning & Recommendation": 1,
-      "Strategic Planning and Data Verification": 1,
-      "strategic planning and architectural critique": 1,
-      "Multi-agent Orchestration Context/Strategic Planning": 1,
-      "Strategic Planning/Wiki Generation": 1,
-      "Wiki State Management": 1,
-      "strategic planning and wiki integration": 1,
-      "Strategic Decision Making": 1,
-      "configuration_acknowledgement": 1,
-      "Strategic Planning and Revision": 1,
-      "Strategic Planning / Evaluation": 2,
-      "Documentation/Wiki Management": 1,
-      "Technical Analysis of Orchestration Framework": 2,
-      "Contextual understanding and wiki integration": 1,
-      "Multi-Agent Orchestration": 1,
-      "Strategic Intent Analysis and Goal Review": 1,
-      "goal_execution": 1,
-      "Task Execution/System Maintenance within Strategic Context": 1,
-      "Direct invocation": 1
+      "Weekly Planning": 1,
+      "Priority Setting": 1,
+      "Multi-Agent Routing": 2,
+      "Goal Status Synchronization": 1,
+      "Empty State Handling": 1,
+      "Resource Reallocation": 1,
+      "Progress Assessment": 1,
+      "Large Wiki Handling": 1,
+      "Long-term Strategy Generation": 1,
+      "Quarterly Roadmap Generation": 1,
+      "Strategic Vision Creation": 1,
+      "Plan Template Generation": 1,
+      "Goal Review and Blocker Analysis": 1,
+      "Stalled Goal Recovery": 1,
+      "Post-Completion Planning": 1,
+      "Agent Role Boundaries": 1,
+      "Schema Reference": 1,
+      "Timeline Generation": 1,
+      "Priority Recommendation": 1
     },
     "stub_count": 0,
-    "total_examples": 50,
-    "duplicate_task_inputs": 25,
-    "example_count": 50,
-    "task_input_avg": 1099.2,
-    "task_input_med": 971,
-    "expected_avg": 282.7,
-    "expected_med": 261,
+    "total_examples": 20,
+    "duplicate_task_inputs": 0,
+    "example_count": 20,
+    "task_input_avg": 43.6,
+    "task_input_med": 46,
+    "expected_avg": 174.2,
+    "expected_med": 166,
     "stub_pct": 0.0,
-    "dup_pct": 50.0
+    "dup_pct": 0.0
   },
   {
     "skill": "companion-interview-pipeline",
     "splits": {
       "train.jsonl": {
-        "count": 14,
-        "file_size_bytes": 21490
+        "count": 10,
+        "file_size_bytes": 4150
       },
       "val.jsonl": {
-        "count": 7,
-        "file_size_bytes": 11039
+        "count": 5,
+        "file_size_bytes": 2099
       },
       "holdout.jsonl": {
-        "count": 7,
-        "file_size_bytes": 9682
+        "count": 5,
+        "file_size_bytes": 2150
       }
     },
     "difficulty_dist": {
-      "easy": 8,
-      "medium": 19,
-      "hard": 1
+      "medium": 10,
+      "hard": 6,
+      "easy": 4
     },
     "categories": {
-      "interview-response-processing": 3,
-      "interview-investigation": 1,
-      "workflow-completion": 2,
-      "interview-workflow": 3,
-      "workflow/process design": 2,
-      "research-investigation": 1,
-      "investigative research using companion role to explore subject behavior and patterns": 1,
-      "personality-exploration": 2,
-      "workflow continuation and memory integration": 3,
-      "interview-feedback/personality-calibration": 6,
-      "single-role-interview-execution": 1,
-      "pipeline-execution": 1,
-      "creative persona exercise": 1,
-      "workflow-invocation-with-knowledge-sharing": 1
+      "synthesis-open-questions": 1,
+      "persona-injection": 1,
+      "post-interview-synthesis": 1,
+      "follow-up-question-generation": 1,
+      "knowledge-graph-triples": 1,
+      "cross-role-theme-analysis": 1,
+      "roundtable-execution": 1,
+      "round-limit-enforcement": 1,
+      "synthesis-behavioral-table": 1,
+      "full-pipeline-execution": 1,
+      "question-count-guidelines": 1,
+      "mnemosyne-storage": 1,
+      "model-fallback": 1,
+      "single-role-interview-flow": 1,
+      "pitfall-handling-delegate-patch": 1,
+      "role-model-assignments": 1,
+      "progress-tracking": 1,
+      "interview-completion-tracking": 1,
+      "pitfall-handling-line-numbers": 1,
+      "wiki-article-creation": 1
     },
     "stub_count": 0,
-    "total_examples": 28,
-    "duplicate_task_inputs": 14,
-    "example_count": 28,
-    "task_input_avg": 1088.5,
-    "task_input_med": 960,
-    "expected_avg": 277.3,
-    "expected_med": 294,
+    "total_examples": 20,
+    "duplicate_task_inputs": 0,
+    "example_count": 20,
+    "task_input_avg": 90.5,
+    "task_input_med": 84,
+    "expected_avg": 199.2,
+    "expected_med": 189,
     "stub_pct": 0.0,
-    "dup_pct": 50.0
+    "dup_pct": 0.0
   },
   {
     "skill": "companion-interview-workflow",
@@ -166,115 +156,85 @@
     "skill": "companion-memory",
     "splits": {
       "train.jsonl": {
-        "count": 22,
-        "file_size_bytes": 28698
+        "count": 51,
+        "file_size_bytes": 37931
       },
       "val.jsonl": {
-        "count": 11,
-        "file_size_bytes": 15077
+        "count": 15,
+        "file_size_bytes": 11022
       },
       "holdout.jsonl": {
-        "count": 12,
-        "file_size_bytes": 17340
+        "count": 15,
+        "file_size_bytes": 11446
       }
     },
     "difficulty_dist": {
-      "medium": 35,
-      "hard": 4,
-      "easy": 6
+      "medium": 32,
+      "hard": 42,
+      "easy": 7
     },
     "categories": {
-      "memory-tool-usage": 1,
-      "memory_management": 4,
-      "mnemosyne-operations": 1,
-      "architecture-integration": 2,
-      "memory-operations": 1,
-      "memory tool usage": 1,
-      "memory-architecture-design": 3,
-      "memory-utilization": 1,
-      "memory-tool-use": 1,
-      "operational maintenance of wiki backing store layer": 2,
-      "Research paper analysis for memory architecture adaptation": 1,
-      "research/information gathering": 1,
-      "research_analysis": 2,
-      "operational/maintenance": 1,
-      "debugging memory issues / observability": 2,
-      "wiki_backing_store": 1,
-      "architecture_discussion": 1,
-      "practical memory usage": 1,
-      "memory invocation/behavior": 1,
-      "wiki-mnemosyne maintenance": 1,
-      "system-maintenance": 1,
-      "memory analysis and emotional pattern extraction": 1,
-      "context-gathering": 1,
-      "wiki-mnemosyne-maintenance": 1,
-      "memory_maintenance": 2,
-      "memory-architecture-mnemosyne-recall": 1,
-      "memory retrieval and synthesis for entity-specific philosophical analysis": 1,
-      "memory tool usage - routine memory review": 1,
-      "maintenance/mnemosyne-operations": 1,
-      "Mnemosyne BEAM integration and staging review": 1,
-      "memory_evaluation_and_usage": 1,
-      "schema_compliance_and_consistency_review": 1,
-      "debugging-and-validation": 1,
-      "operational_monitoring": 1,
-      "memory-categorization": 1
+      "architecture_understanding": 8,
+      "tool_usage": 20,
+      "health_check": 11,
+      "troubleshooting": 15,
+      "design_principles": 11,
+      "constraint_enforcement": 4,
+      "integration": 12
     },
-    "stub_count": 10,
-    "total_examples": 45,
-    "duplicate_task_inputs": 27,
-    "example_count": 45,
-    "task_input_avg": 952.4,
-    "task_input_med": 820,
-    "expected_avg": 252.5,
-    "expected_med": 251,
-    "stub_pct": 22.2,
-    "dup_pct": 60.0
+    "stub_count": 0,
+    "total_examples": 81,
+    "duplicate_task_inputs": 0,
+    "example_count": 81,
+    "task_input_avg": 167.4,
+    "task_input_med": 165,
+    "expected_avg": 475.1,
+    "expected_med": 478,
+    "stub_pct": 0.0,
+    "dup_pct": 0.0
   },
   {
     "skill": "companion-memory-tiers",
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 3267
+        "file_size_bytes": 3730
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 1648
+        "file_size_bytes": 1804
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 1488
+        "file_size_bytes": 1744
       }
     },
     "difficulty_dist": {
-      "hard": 6,
-      "easy": 6,
-      "medium": 8
+      "medium": 8,
+      "hard": 5,
+      "easy": 7
     },
     "categories": {
-      "Troubleshooting/Verification": 1,
-      "Provenance Tracking": 2,
-      "Troubleshooting/Analysis": 1,
-      "Memory Classification": 1,
-      "TTL Management": 1,
-      "Troubleshooting": 1,
-      "Tier Lifecycle Management": 3,
-      "CLI Tool Usage": 3,
-      "Dreamer Operations": 3,
-      "Integration/Bulk Seeding": 1,
-      "Design Decision Understanding": 1,
-      "Memory Querying": 1,
-      "Bulk Seeding": 1
+      "dreamer_operations": 3,
+      "tier_management": 5,
+      "system_validation": 1,
+      "bulk_seeding": 2,
+      "provenance_verification": 1,
+      "system_initialization": 1,
+      "memory_querying": 2,
+      "ttl_management": 1,
+      "error_handling": 2,
+      "system_diagnostics": 1,
+      "edge_case_handling": 1
     },
     "stub_count": 0,
     "total_examples": 20,
     "duplicate_task_inputs": 0,
     "example_count": 20,
-    "task_input_avg": 74.0,
-    "task_input_med": 70,
-    "expected_avg": 120.5,
-    "expected_med": 112,
+    "task_input_avg": 78.9,
+    "task_input_med": 79,
+    "expected_avg": 161.6,
+    "expected_med": 162,
     "stub_pct": 0.0,
     "dup_pct": 0.0
   },
@@ -283,15 +243,15 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 5976
+        "file_size_bytes": 5953
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 3187
+        "file_size_bytes": 2801
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2643
+        "file_size_bytes": 3052
       }
     },
     "difficulty_dist": {
@@ -300,23 +260,23 @@
       "hard": 4
     },
     "categories": {
-      "curator_data_validation": 1,
-      "system_health_monitoring": 1,
-      "ceo_strategic_planning_mode": 1,
-      "persona_retrieval": 3,
-      "researcher_source_verification": 1,
-      "psychologist_cognitive_bias_detection": 1,
-      "psychologist_group_dynamics_analysis": 1,
-      "mnemosyne_integration": 2,
-      "psychologist_wiki_output_format": 1,
-      "multi_persona_orchestration": 1,
-      "manager_schema_compliance": 1,
       "philosopher_pre_decision_interception": 1,
-      "hr_systemic_analysis": 1,
-      "philosopher_false_dichotomy_detection": 1,
+      "persona_retrieval": 3,
+      "curator_data_validation": 1,
+      "psychologist_cognitive_bias_detection": 1,
       "new_persona_creation": 1,
+      "psychologist_wiki_output_format": 1,
+      "ceo_strategic_planning_mode": 1,
       "engineer_pragmatic_intervention": 1,
-      "persona_anchoring": 1
+      "mnemosyne_integration": 2,
+      "philosopher_false_dichotomy_detection": 1,
+      "manager_schema_compliance": 1,
+      "psychologist_group_dynamics_analysis": 1,
+      "persona_anchoring": 1,
+      "hr_systemic_analysis": 1,
+      "system_health_monitoring": 1,
+      "multi_persona_orchestration": 1,
+      "researcher_source_verification": 1
     },
     "stub_count": 0,
     "total_examples": 20,
@@ -334,52 +294,52 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 6582
+        "file_size_bytes": 6525
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 3655
+        "file_size_bytes": 3126
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 3335
+        "file_size_bytes": 3146
       }
     },
     "difficulty_dist": {
-      "medium": 12,
-      "hard": 5,
+      "medium": 9,
+      "hard": 8,
       "easy": 3
     },
     "categories": {
-      "one_by_one_roundtable_pipeline": 1,
-      "truncation_handling": 1,
-      "falsifiability_pattern": 1,
-      "investigation_session_phase2": 1,
-      "chunking_compliance": 1,
-      "storage_protocol": 1,
-      "after_session_effectiveness": 1,
-      "deep_working_session": 1,
-      "research_backed_evaluation": 1,
-      "format_selection": 1,
-      "evaluation_pipeline_checkpoint": 1,
-      "investigation_session_phase1": 1,
-      "staging_pattern_application": 1,
-      "incubation_revisit_pattern": 1,
-      "role_persona_adherence": 1,
-      "model_assignment": 1,
-      "natural_conversation_flow": 1,
-      "self_contradiction_check": 1,
-      "ceo_conduct_directive": 1,
-      "pipeline_orchestration": 1
+      "Pitfall Handling - Missing Roles": 1,
+      "External Research Evaluation Pipeline": 1,
+      "Stress Testing & Pitfall Avoidance": 1,
+      "Pattern Application - Incubation & Self-Contradiction": 1,
+      "Storage & Protocol Compliance": 1,
+      "Formal Meeting Chunking with Input": 1,
+      "Investigation Session - Role-Specific Tool Use": 1,
+      "Investigation Session Pipeline": 1,
+      "Pattern Combination - Incubation & Deep Session": 1,
+      "After-Session Pattern": 1,
+      "Deep vs. Short Session Prompting": 1,
+      "Format Selection": 1,
+      "Full Pipeline Orchestration": 1,
+      "Truncation Recovery & Continuity": 1,
+      "Storage Protocol - Multiple Sessions": 1,
+      "Format Execution & Structure": 1,
+      "Pattern Application - Falsifiability": 1,
+      "Chunking & Generation Limits": 1,
+      "Pattern Application - Conduct Directive": 1,
+      "Turn Count Calibration & Role Selection": 1
     },
     "stub_count": 0,
     "total_examples": 20,
     "duplicate_task_inputs": 0,
     "example_count": 20,
-    "task_input_avg": 133.8,
-    "task_input_med": 131,
-    "expected_avg": 407.9,
-    "expected_med": 400,
+    "task_input_avg": 163.4,
+    "task_input_med": 172,
+    "expected_avg": 335.7,
+    "expected_med": 329,
     "stub_pct": 0.0,
     "dup_pct": 0.0
   },
@@ -388,29 +348,29 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 4359
+        "file_size_bytes": 4412
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2331
+        "file_size_bytes": 2286
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2234
+        "file_size_bytes": 2226
       }
     },
     "difficulty_dist": {
+      "easy": 6,
       "hard": 7,
-      "medium": 7,
-      "easy": 6
+      "medium": 7
     },
     "categories": {
-      "delegation_patterns": 5,
+      "toolset_safety": 1,
       "pii_handling": 6,
       "wiki_memory": 3,
       "bug_workarounds": 4,
-      "credentials": 1,
-      "toolset_safety": 1
+      "delegation_patterns": 5,
+      "credentials": 1
     },
     "stub_count": 0,
     "total_examples": 20,
@@ -428,47 +388,41 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 4524
+        "file_size_bytes": 4077
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2193
+        "file_size_bytes": 2366
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2195
+        "file_size_bytes": 2314
       }
     },
     "difficulty_dist": {
-      "easy": 10,
-      "medium": 9,
-      "hard": 1
+      "medium": 8,
+      "easy": 4,
+      "hard": 8
     },
     "categories": {
-      "Intent Routing & Agent Delegation": 1,
-      "Sub-skill Redirection & Internal References": 1,
-      "Agent Role Mapping": 1,
-      "Sub-skill Redirection & Safety": 1,
-      "Nous API Quirks": 4,
-      "Agent Roles & Memory Management": 1,
-      "Workflow Selection & Agent Roles": 1,
-      "Safety Rule Adherence & Agent Role Tools": 1,
-      "Agent Role Mapping & Workflow Selection": 1,
-      "Workflow Selection": 2,
-      "Intent Routing & Workflow Selection": 1,
-      "Practical Delegation & Persona Injection": 1,
-      "Workflow Selection & Multi-agent Interaction": 2,
-      "Persona Injection & Agent Roles": 1,
-      "Safety Rule Adherence & Multi-tool Delegation": 1
+      "handoff_execution": 3,
+      "data_pipeline": 1,
+      "safety_compliance": 2,
+      "api_quirks": 4,
+      "workflow_selection": 3,
+      "intent_routing": 2,
+      "plan_review": 2,
+      "bug_workaround": 2,
+      "persona_injection": 1
     },
     "stub_count": 0,
     "total_examples": 20,
     "duplicate_task_inputs": 0,
     "example_count": 20,
-    "task_input_avg": 110.8,
-    "task_input_med": 120,
-    "expected_avg": 198.3,
-    "expected_med": 214,
+    "task_input_avg": 90.2,
+    "task_input_med": 94,
+    "expected_avg": 225.3,
+    "expected_med": 227,
     "stub_pct": 0.0,
     "dup_pct": 0.0
   },
@@ -477,15 +431,15 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 4725
+        "file_size_bytes": 4647
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2504
+        "file_size_bytes": 2309
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2313
+        "file_size_bytes": 2586
       }
     },
     "difficulty_dist": {
@@ -495,15 +449,15 @@
     },
     "categories": {
       "pattern_selection": 9,
-      "skill_review_class_thinking": 2,
-      "skill_review_without_tools": 1,
-      "feedback_loop_quality": 1,
       "feedback_loop_structure": 1,
+      "skill_review_class_thinking": 2,
       "feedback_loop_execution": 2,
-      "feedback_loop_voice_authenticity": 1,
+      "feedback_loop_quality": 1,
       "skill_review_consolidation": 1,
       "feedback_loop_synthesis": 1,
-      "skill_review_with_tools": 1
+      "feedback_loop_voice_authenticity": 1,
+      "skill_review_with_tools": 1,
+      "skill_review_without_tools": 1
     },
     "stub_count": 0,
     "total_examples": 20,
@@ -520,32 +474,58 @@
     "skill": "github-code-review",
     "splits": {
       "train.jsonl": {
-        "count": 1,
-        "file_size_bytes": 469
+        "count": 23,
+        "file_size_bytes": 9119
       },
       "val.jsonl": {
-        "count": 0,
-        "file_size_bytes": 0
+        "count": 10,
+        "file_size_bytes": 3706
       },
       "holdout.jsonl": {
-        "count": 0,
-        "file_size_bytes": 0
+        "count": 10,
+        "file_size_bytes": 3987
       }
     },
     "difficulty_dist": {
-      "medium": 1
+      "hard": 18,
+      "easy": 10,
+      "medium": 15
     },
     "categories": {
-      "Code Quality/Debugging": 1
+      "end-to-end-pr-review": 2,
+      "code-quality-check": 3,
+      "security-check": 2,
+      "local-review": 2,
+      "submit-review": 3,
+      "pr-comments": 1,
+      "inline-comments": 1,
+      "roast_mode": 2,
+      "praise_mode": 2,
+      "sigh_mode": 1,
+      "manifest_mode": 1,
+      "retro_mode": 1,
+      "jailbreak_mode": 2,
+      "parseltongue_mode": 3,
+      "absurd_mode": 2,
+      "prefill_mode": 1,
+      "boundaries_mode": 2,
+      "roulette_mode": 2,
+      "pr-viewing": 1,
+      "pr-checkout": 2,
+      "api-interaction": 2,
+      "watch_mode": 1,
+      "local-review-workflow": 1,
+      "multi_mode": 2,
+      "multi_godmode": 1
     },
     "stub_count": 0,
-    "total_examples": 1,
+    "total_examples": 43,
     "duplicate_task_inputs": 0,
-    "example_count": 1,
-    "task_input_avg": 145.0,
-    "task_input_med": 145,
-    "expected_avg": 193.0,
-    "expected_med": 193,
+    "example_count": 43,
+    "task_input_avg": 68.7,
+    "task_input_med": 67,
+    "expected_avg": 203.1,
+    "expected_med": 185,
     "stub_pct": 0.0,
     "dup_pct": 0.0
   },
@@ -554,49 +534,44 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 4876
+        "file_size_bytes": 5499
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2410
+        "file_size_bytes": 2660
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2562
+        "file_size_bytes": 2630
       }
     },
     "difficulty_dist": {
-      "medium": 11,
-      "hard": 4,
-      "easy": 5
+      "medium": 10,
+      "easy": 5,
+      "hard": 5
     },
     "categories": {
-      "security": 2,
-      "contributing": 1,
+      "voice_tts": 2,
+      "configuration": 3,
+      "multi-agent": 2,
+      "gateway": 2,
+      "cron": 1,
       "troubleshooting": 2,
-      "voice_tts_stt": 1,
-      "spawning_agents": 2,
-      "installation": 1,
-      "webhooks": 1,
-      "mcp_servers": 1,
-      "memory": 1,
-      "cli_commands": 1,
-      "sessions": 1,
-      "gateway_messaging": 1,
-      "profiles": 1,
-      "skills_management": 1,
-      "tools_management": 1,
-      "configuration": 1,
-      "cron_jobs": 1
+      "security": 1,
+      "mcp": 1,
+      "contributing": 1,
+      "tools": 1,
+      "profiles": 2,
+      "skills_tools": 2
     },
     "stub_count": 0,
     "total_examples": 20,
     "duplicate_task_inputs": 0,
     "example_count": 20,
-    "task_input_avg": 75.2,
-    "task_input_med": 75,
-    "expected_avg": 299.1,
-    "expected_med": 304,
+    "task_input_avg": 119.8,
+    "task_input_med": 123,
+    "expected_avg": 301.9,
+    "expected_med": 288,
     "stub_pct": 0.0,
     "dup_pct": 0.0
   },
@@ -605,38 +580,38 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 4963
+        "file_size_bytes": 5344
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2888
+        "file_size_bytes": 2834
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 3007
+        "file_size_bytes": 2680
       }
     },
     "difficulty_dist": {
+      "medium": 9,
       "hard": 7,
-      "easy": 4,
-      "medium": 9
+      "easy": 4
     },
     "categories": {
-      "preventive_maintenance": 1,
       "health_check": 4,
-      "database_diagnosis": 1,
-      "guardian_script": 2,
-      "bug_diagnosis": 1,
-      "dreamer_troubleshooting": 1,
-      "noise_cleanup": 1,
-      "embedding_concepts": 1,
-      "embedding_backfill": 2,
-      "dreamer_review": 1,
-      "beam_consolidation": 1,
-      "wiki_maturation": 1,
       "root_cause_analysis": 1,
+      "embedding_backfill": 2,
+      "database_diagnosis": 1,
+      "noise_cleanup": 1,
+      "preventive_maintenance": 1,
+      "guardian_script": 2,
+      "dreamer_troubleshooting": 1,
+      "bug_diagnosis": 1,
       "beam_troubleshooting": 1,
-      "dreamer_concepts": 1
+      "wiki_maturation": 1,
+      "embedding_concepts": 1,
+      "dreamer_concepts": 1,
+      "beam_consolidation": 1,
+      "dreamer_review": 1
     },
     "stub_count": 1,
     "total_examples": 20,
@@ -694,15 +669,15 @@
     "splits": {
       "train.jsonl": {
         "count": 10,
-        "file_size_bytes": 5475
+        "file_size_bytes": 5586
       },
       "val.jsonl": {
         "count": 5,
-        "file_size_bytes": 2769
+        "file_size_bytes": 2695
       },
       "holdout.jsonl": {
         "count": 5,
-        "file_size_bytes": 2743
+        "file_size_bytes": 2706
       }
     },
     "difficulty_dist": {
@@ -711,26 +686,26 @@
       "hard": 4
     },
     "categories": {
-      "Phase 1 - reproducible conditions before fixing UI bugs": 1,
-      "Phase 1 - reproducing and gathering evidence when error unclear": 1,
-      "Phase 1 - error reading and data flow tracing": 1,
-      "Performance debugging - finding root cause of gradual degradation": 1,
-      "Rationalization avoidance - 'simple issue' excuse": 1,
-      "Iron Law adherence - refusing to skip investigation": 1,
-      "Phase 1 - investigating non-deterministic behavior": 1,
-      "Phase 4 - regression test creation before deployment": 1,
-      "Rationalization avoidance - 'emergency' excuse": 1,
-      "Symptom fix detection - recognizing 'fix the test' as a violation": 1,
-      "Phase 4 - test-first verification before implementing fix": 1,
-      "Phase 4 Step 5 - architectural problem recognition": 1,
-      "Phase 1 - checking recent changes with many candidates": 1,
-      "Rule of Three - recognizing architectural problems vs failed hypotheses": 1,
       "Phase 2 - reading reference implementations completely": 1,
-      "Phase 3 - single variable testing, no bundled changes": 1,
+      "Rationalization avoidance - 'emergency' excuse": 1,
       "Phase 1 - understanding why the dependency is missing": 1,
-      "Phase 1 - upstream data flow tracing to find source": 1,
+      "Phase 4 - test-first verification before implementing fix": 1,
+      "Iron Law adherence - refusing to skip investigation": 1,
+      "Performance debugging - finding root cause of gradual degradation": 1,
+      "Phase 1 - reproducing and gathering evidence when error unclear": 1,
+      "Symptom fix detection - recognizing 'fix the test' as a violation": 1,
       "Phase 3 - hypothesis formation with evidence backing": 1,
-      "Multi-component debugging - gathering evidence before fix": 1
+      "Phase 1 - reproducible conditions before fixing UI bugs": 1,
+      "Rule of Three - recognizing architectural problems vs failed hypotheses": 1,
+      "Rationalization avoidance - 'simple issue' excuse": 1,
+      "Phase 1 - investigating non-deterministic behavior": 1,
+      "Phase 1 - error reading and data flow tracing": 1,
+      "Phase 4 Step 5 - architectural problem recognition": 1,
+      "Phase 3 - single variable testing, no bundled changes": 1,
+      "Phase 1 - checking recent changes with many candidates": 1,
+      "Phase 1 - upstream data flow tracing to find source": 1,
+      "Multi-component debugging - gathering evidence before fix": 1,
+      "Phase 4 - regression test creation before deployment": 1
     },
     "stub_count": 0,
     "total_examples": 20,

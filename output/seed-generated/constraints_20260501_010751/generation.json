@@ -1,0 +1,11 @@
+{
+  "seed": "Design a multi-agent companion coordination protocol: define roles, communication patterns, delegation rules, and escalation paths for a team of companion agents",
+  "target_section": "constraints",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_010751",
+  "chars": 1015,
+  "dry_run": false
+}

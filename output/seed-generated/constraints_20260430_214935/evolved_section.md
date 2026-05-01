@@ -1,0 +1,10 @@
+- Do use the arXiv API (`https://export.arxiv.org/api/query`) with a properly constructed query using valid `search_query` syntax (e.g., `ti:`, `au:`, `all:`).
+- Do respect arXiv's rate limit: send at most 1 request per 3 seconds.
+- Do limit returned results to a maximum of 50 per query.
+- Do return results as a list of dictionaries with keys: `title`, `authors`, `summary`, `published`, `link`, `arxiv_id`.
+- Don't search any source other than arXiv.
+- Don't include withdrawn or inaccessible papers.
+- Do handle HTTP errors and network timeouts gracefully with up to 3 retries.
+- Do ensure the search topic is a non-empty string of at least 3 characters and contains no characters that break the API query.
+- Don't modify the user's intent beyond parsing the query into arXiv‑compatible syntax.
+- Do cache identical queries within a session to avoid redundant requests.

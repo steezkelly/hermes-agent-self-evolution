@@ -111,47 +111,73 @@ def get_nous_credentials() -> Optional[dict]:
 
 
 def _get_lm_kwargs(model: str) -> Tuple[dict, str]:
-    """Build DSPy LM kwargs with correct provider routing based on model name.
+    """Build DSPy LM kwargs with correct provider routing.
 
-    Routes models to their correct provider instead of using a single global
-    priority. This allows mixing providers -- e.g. deepseek-v4-pro through
-    Ollama Cloud as optimizer while minimax/m2.7 through MiniMax as eval.
+    Routes models by name pattern:
+    1. 'minimax/' prefix → MiniMax API (Nous fallback if exhausted)
+    2. 'deepseek-' bare prefix (no /) → Ollama Cloud
+    3. Any 'provider/model' format with / → Nous Portal unified gateway
+    4. Fallback: backward-compatible env priority chain
 
-    Provider detection:
-    1. \'minimax/\' prefix -> MiniMax API
-    2. \'deepseek-\' prefix -> Ollama Cloud (with thinking fix)
-    3. \'openai/\' or \'openrouter/\' prefix -> OpenRouter
-    4. Fallback: backward-compatible env-based priority chain
+    Nous Portal is the catch-all for provider-prefixed models (e.g.
+    deepseek/deepseek-v4-pro, anthropic/claude-sonnet-4) that don't
+    match the specific branches above.
     """
     model_lower = model.lower()
     base_url = None
     api_key = None
+    nous = None  # cached for branches that need it
 
-    # 1. MiniMax models → MiniMax API directly
+    def _get_nous():
+        nonlocal nous
+        if nous is None:
+            nous = get_nous_credentials()
+        return nous
+
+    # 1. MiniMax models → MiniMax API (with Nous fallback when exhausted)
     if model_lower.startswith("minimax/"):
         api_key = os.getenv("MINIMAX_API_KEY")
         if api_key and api_key != "***" and api_key.strip():
-            base_url = os.getenv(
-                "MINIMAX_BASE_URL", "https://api.minimax.io/anthropic/v1"
-            )
-            # Ensure /v1 suffix for the API endpoint
-            if not base_url.endswith("/v1"):
-                base_url = base_url.rstrip("/") + "/v1"
+            auth_path = Path.home() / ".hermes" / "auth.json"
+            try:
+                data = json.loads(auth_path.read_text())
+                pool = data.get("credential_pool", {}).get("minimax", [])
+                for entry in pool:
+                    if entry.get("last_status") == "exhausted":
+                        n = _get_nous()
+                        if n:
+                            print("[AUTH] MiniMax key exhausted → Nous Portal")
+                            api_key = n["api_key"]
+                            base_url = n["base_url"]
+                            if not base_url.endswith("/v1"):
+                                base_url = base_url.rstrip("/") + "/v1"
+                            break
+            except Exception:
+                pass
+            if not base_url:
+                base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.io/anthropic/v1")
+                if not base_url.endswith("/v1"):
+                    base_url = base_url.rstrip("/") + "/v1"
 
-    # 2. DeepSeek models -> Ollama Cloud (with thinking fix)
+    # 2. DeepSeek bare models (no /) -> Ollama Cloud
     elif model_lower.startswith("deepseek-"):
         api_key = os.getenv("OLLAMA_API_KEY")
         if api_key and api_key != "***" and api_key.strip():
             base_url = os.getenv("OLLAMA_BASE_URL", "https://ollama.com/v1")
             _install_ollama_response_fix()
 
-    # 3. OpenAI/OpenRouter models
-    elif model_lower.startswith("openai/") or model_lower.startswith("openrouter/"):
-        api_key = os.getenv("OPENROUTER_API_KEY")
-        if api_key and api_key != "***" and api_key.strip():
-            base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    # 3. Catch-all: any 'provider/model' format → Nous Portal
+    # This covers: deepseek/deepseek-v4-pro, anthropic/claude-sonnet-4,
+    # xiaomi/mimo-v2.5, qwen/qwen3-max, etc.
+    elif "/" in model:
+        n = _get_nous()
+        if n:
+            base_url = n["base_url"]
+            if not base_url.endswith("/v1"):
+                base_url = base_url.rstrip("/") + "/v1"
+            api_key = n["api_key"]
 
-    # 4. Fallback: backward-compatible priority chain
+    # 4. Fallback: backward-compatible env priority chain
     if not base_url or not api_key:
         chain_base = os.getenv("OPENROUTER_BASE_URL")
         chain_key = os.getenv("OPENROUTER_API_KEY")
@@ -184,9 +210,13 @@ def _get_lm_kwargs(model: str) -> Tuple[dict, str]:
     os.environ["OPENAI_API_KEY"] = api_key
 
     # Stripping provider prefix for litellm routing
+    # MiniMax through MiniMax API: keep bare model (litellm expects bare)
+    # Everything else through Nous Portal: keep full provider/model format
     bare_model = model
-    if "/" in model and not model.startswith("minimax/"):
+    if "/" in model and model_lower.startswith("minimax/"):
         bare_model = model.split("/", 1)[-1]
+    # For other provider/model formats, litellm handles them as-is
+    # through the Nous unified gateway
 
     kwargs = {
         "api_base": base_url,
