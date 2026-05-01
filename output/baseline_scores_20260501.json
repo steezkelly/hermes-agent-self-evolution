@@ -29,10 +29,13 @@
   },
   {
     "skill": "linear-issue-creator",
-    "avg_score": 0.341,
+    "avg_score": 0.5,
     "old_baseline": null,
     "delta": null,
-    "note": "Phase 3 new capability - natural language to Linear issues. Low score - Linear API is complex"
+    "note": "GEPA valset 72%, holdout 50%. Iteration 4 improved valset (+5.6%) but not holdout.",
+    "eval_source": "synthetic_holdout",
+    "gepa_baseline": 0.72,
+    "gepa_holdout": 0.5
   },
   {
     "skill": "codebase-metrics",
