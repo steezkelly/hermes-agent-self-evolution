@@ -1,0 +1,11 @@
+{
+  "seed": "Convert natural language task descriptions into structured Linear issues with title, description, priority, team, and assignee fields via the Linear GraphQL API",
+  "target_section": "constraints",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_030149",
+  "chars": 1414,
+  "dry_run": false
+}

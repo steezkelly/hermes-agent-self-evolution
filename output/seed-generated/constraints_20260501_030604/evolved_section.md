@@ -1,0 +1,12 @@
+- Do generate Linear issues that include all required fields: title, description, priority, team, and assignee.
+- Do use the Linear GraphQL API as the sole mechanism for issue creation.
+- Don't create, update, or delete issues via any other method (e.g., REST API, manual entry).
+- Do map the extracted priority (e.g., "urgent", "high", "medium", "low") to Linear's numeric priority scale (0 for no priority, 1 for urgent, 2 for high, 3 for medium, 4 for low).
+- Do ensure the team field is a valid Linear team ID or key; don't infer or create teams that don't exist.
+- Do assign the issue to a valid Linear user only when the user can be identified from the task description; don't assign to unknown or placeholder users.
+- Do format the issue description using Markdown when the task description includes structured text (e.g., bullet points, code blocks).
+- Don't include extraneous text, headings, or formatting outside the defined issue fields.
+- Do limit the issue title to at most 255 characters and the description to at most 65535 characters.
+- Don't proceed if any required field (title, team) is missing from the parsed output; instead, indicate the missing field as an error.
+- Do respect Linear's rate limits and authentication requirements; don't send requests without a valid API token.
+- Don't modify existing issues or perform other GraphQL mutations unless explicitly instructed in the seed task.

@@ -1,0 +1,11 @@
+{
+  "seed": "Synthesize a comprehensive research report from web search, arXiv papers, and wiki notes on a given topic, producing an structured summary with key findings, disagreements, and open questions",
+  "target_section": "constraints",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_025547",
+  "chars": 1428,
+  "dry_run": false
+}

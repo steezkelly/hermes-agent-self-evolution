@@ -1,0 +1,11 @@
+{
+  "seed": "Analyze a codebase directory and produce a metrics report: line counts per language, file count, estimated complexity hotspots, and summary statistics using pygount",
+  "target_section": "verification",
+  "iterations": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "n_examples": 3,
+  "timestamp": "20260501_031006",
+  "chars": 1471,
+  "dry_run": false
+}

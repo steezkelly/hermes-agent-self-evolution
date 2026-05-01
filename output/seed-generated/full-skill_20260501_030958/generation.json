@@ -1,0 +1,35 @@
+{
+  "seed": "Convert natural language task descriptions into structured Linear issues with title, description, priority, team, and assignee fields via the Linear GraphQL API",
+  "iterations_per_section": 1,
+  "optimizer_model": "deepseek/deepseek-v4-pro",
+  "eval_model": "deepseek/deepseek-v4-flash",
+  "coherence_passed": false,
+  "coherence_issues": "1. **Contradictory priority mapping**: In `steps` section 4, the mapping is `0=urgent, 1=high, 2=medium, 3=low`. In `constraints`, the mapping is `0=no priority, 1=urgent, 2=high, 3=medium, 4=low`. Th",
+  "section_metrics": {
+    "examples": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "steps": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "pitfalls": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "constraints": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "verification": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    }
+  },
+  "total_elapsed_seconds": 234.21333360671997,
+  "skill_name": "convert-natural-language-task-descriptio",
+  "skill_description": "Convert natural language task descriptions into structured Linear issues with title, description, priority, team, and assignee fields via the Linear GraphQL API",
+  "total_chars": 8817,
+  "timestamp": "20260501_030958"
+}

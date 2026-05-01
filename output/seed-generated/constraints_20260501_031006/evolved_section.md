@@ -1,0 +1,10 @@
+- The skill MUST use the `pygount` library to perform the analysis. Do not use alternative tools or manual counting.
+- The output MUST be a metrics report containing: line counts per language, total file count, identified complexity hotspots (e.g., files with high line counts or high comment-to-code ratio), and summary statistics (e.g., average lines per file, most used language).
+- The skill MUST analyze a directory specified as input. If the input is not a valid directory path, the skill MUST return an error message and not proceed.
+- Do not modify any files within the analyzed codebase directory. The analysis is read-only.
+- The report MUST be generated in a structured text format (e.g., Markdown table or plain text list). Avoid unstructured prose.
+- The skill MUST respect any `.gitignore` rules or common non-source directories (e.g., `node_modules`, `__pycache__`, `.venv`) by either ignoring them or explicitly documenting that they were skipped.
+- The skill MUST handle cases where `pygount` is not installed, by returning a clear error message instructing the user to install it (e.g., `pip install pygount`).
+- Do not include any personal or sensitive information from the analyzed files in the report.
+- The skill MUST complete within a reasonable time (e.g., 60 seconds) for moderately sized directories (up to 1000 files). For larger directories, it MAY output a warning and still proceed.
+- The report MUST include a timestamp of when the analysis was performed.

@@ -1,0 +1,13 @@
+- Do use at least three distinct web sources, two arXiv papers, and one wiki page as primary inputs for the report.
+- Do cite all sources with proper references (URLs, arXiv IDs, or wiki page titles) in a consistent format.
+- Do structure the summary into three mandatory sections: Key Findings, Disagreements, and Open Questions.
+- Do ensure the report is strictly factual and based solely on the cited sources; avoid personal opinion or speculation.
+- Don't include any information from sources that are not explicitly listed or cited.
+- Do limit the final report to between 500 and 1500 words.
+- Don't plagiarize: paraphrase content and use quotation marks where direct quotes are necessary, with citations.
+- Do verify that arXiv papers are from recognized categories (e.g., cs, physics, math, biology) and are published or accepted for publication.
+- Don't include content from sources that are outdated (more than 5 years old) unless the topic specifically requires historical context.
+- Do check that the topic does not involve prohibited content (e.g., harmful, illegal, or unethical research).
+- Don't include unverifiable claims, rumors, or information from non-credible sources (e.g., personal blogs, forums).
+- Do ensure the report is self-contained and understandable to a general academic audience without requiring external reading.
+- Do use standard English grammar and spelling; avoid jargon without definition.

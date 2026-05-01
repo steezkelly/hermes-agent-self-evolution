@@ -20,15 +20,21 @@ import dspy
 
 
 SKILLS = [
+    # Phase 2: replacement skills (with old baselines for comparison)
     ("hermes-agent-author", "~/.hermes/skills/companion-system/hermes-agent-author/SKILL.md"),
     ("design-a-multi-agent-companion-coordinat", "~/.hermes/skills/companion-system/design-a-multi-agent-companion-coordinat/SKILL.md"),
     ("github-pr-review", "~/.hermes/skills/github/github-pr-review/SKILL.md"),
+    # Phase 3: new skills (no old baseline — pure new capability)
+    ("research-synthesis", "~/.hermes/skills/research/research-synthesis/SKILL.md"),
+    ("linear-issue-creator", "~/.hermes/skills/productivity/linear-issue-creator/SKILL.md"),
+    ("codebase-metrics", "~/.hermes/skills/data-science/codebase-metrics/SKILL.md"),
 ]
 
 OLD_BASELINES = {
     "hermes-agent-author": 0.627,  # companion-personas
     "design-a-multi-agent-companion-coordinat": 0.731,  # companion-system-orchestration
     "github-pr-review": 0.650,  # github-code-review
+    # Phase 3: no baselines — new territory
 }
 
 EVAL_MODEL = sys.argv[1] if len(sys.argv) > 1 else "deepseek/deepseek-v4-flash"
@@ -103,9 +109,13 @@ if __name__ == "__main__":
         try:
             r = score_skill(skill_path, skill_name, EVAL_MODEL)
             results.append(r)
-            delta = r["delta"]
-            old = r["old_baseline"]
-            print(f"  Score: {r['avg_score']:.4f} | Old: {old:.4f} | Delta: {delta:+.4f}")
+            old = r.get("old_baseline")
+            delta = r.get("delta")
+            if old is not None:
+                delta_str = f"delta={delta:+.4f}"
+            else:
+                delta_str = "delta=N/A (new skill)"
+            print(f"  Score: {r['avg_score']:.4f} | Old: {old if old else 'N/A':<8} | {delta_str}")
         except Exception as e:
             print(f"  ERROR: {e}")
             import traceback

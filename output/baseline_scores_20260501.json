@@ -1,23 +1,44 @@
 [
   {
     "skill": "hermes-agent-author",
-    "avg_score": 0.5004,
+    "avg_score": 0.5278,
     "old_baseline": 0.627,
-    "delta": -0.127,
-    "note": "NOT COMPARABLE - old skill was persona lookup catalog, new skill generates personas"
+    "delta": -0.0992,
+    "note": "Phase 2 replacement - regression vs companion-personas catalog"
   },
   {
     "skill": "design-a-multi-agent-companion-coordinat",
-    "avg_score": 0.6211,
+    "avg_score": 0.6218,
     "old_baseline": 0.731,
-    "delta": -0.11,
-    "note": "REAL REGRESSION - new skill less comprehensive than old"
+    "delta": -0.1092,
+    "note": "Phase 2 replacement - regression vs companion-system-orchestration"
   },
   {
     "skill": "github-pr-review",
-    "avg_score": 0.578,
+    "avg_score": 0.5849,
     "old_baseline": 0.65,
-    "delta": -0.072,
-    "note": "MODEST REGRESSION"
+    "delta": -0.0651,
+    "note": "Phase 2 replacement - modest regression vs github-code-review"
+  },
+  {
+    "skill": "research-synthesis",
+    "avg_score": 0.56,
+    "old_baseline": null,
+    "delta": null,
+    "note": "Phase 3 new capability - web/arxiv/wiki research synthesis"
+  },
+  {
+    "skill": "linear-issue-creator",
+    "avg_score": 0.341,
+    "old_baseline": null,
+    "delta": null,
+    "note": "Phase 3 new capability - natural language to Linear issues. Low score - Linear API is complex"
+  },
+  {
+    "skill": "codebase-metrics",
+    "avg_score": 0.527,
+    "old_baseline": null,
+    "delta": null,
+    "note": "Phase 3 new capability - codebase metrics via pygount"
   }
 ]
