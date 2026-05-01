@@ -31,8 +31,10 @@ from evolution.core.nous_auth import _get_lm_kwargs
 
 console = Console()
 
-# 11-section project condensed to these core 5 for generation in this script.
-SECTION_ORDER = ["steps", "pitfalls", "examples", "constraints", "verification"]
+# 10-section target (expanded from original 5):
+#   overview, when-to-use, steps, pitfalls, examples, constraints,
+#   verification, troubleshooting, variants, related-skills
+SECTION_ORDER = ["overview", "when-to-use", "steps", "pitfalls", "examples", "constraints", "verification", "troubleshooting", "variants", "related-skills"]
 
 # Model name normalization.
 # Some call-sites pass "deepseek-v4-flash" (no provider slash), but Nous/OpenAI
@@ -107,6 +109,45 @@ SECTION_TEMPLATES: dict[str, str] = {
         "Describe how to test correctness. Include at least 2 checks with clear pass/fail criteria. "
         "Prefer lightweight tests the agent (or a user) can perform. "
         "Avoid including the heading '## Verification'."
+    ),
+    "overview": (
+        "Write the SKILL.md 'Overview' section content for a Hermes Agent skill. "
+        "This section should: define what the skill does in 2-4 sentences, "
+        "explain the core mental model or key principle behind it, "
+        "and clarify what outputs or outcomes the skill produces. "
+        "Avoid vague marketing language; be specific and concrete. "
+        "Avoid including the heading '## Overview'."
+    ),
+    "when-to-use": (
+        "Write the SKILL.md 'When to Use' section content for a Hermes Agent skill. "
+        "This section should: list 3-5 concrete trigger scenarios where this skill is the right tool, "
+        "list 2-3 cases where this skill should NOT be used (and what to do instead), "
+        "and note any prerequisites or preconditions before invoking the skill. "
+        "Be specific enough that an agent can self-check whether this skill applies. "
+        "Avoid including the heading '## When to Use'."
+    ),
+    "troubleshooting": (
+        "Write the SKILL.md 'Troubleshooting' section content for a Hermes Agent skill. "
+        "This section should: list 3-5 common failure modes or edge cases, "
+        "for each failure, explain the likely cause and how to recover or work around it, "
+        "include any known gotchas or surprising behaviors specific to this skill. "
+        "Use bullet points with clear if-this-then-that structure. "
+        "Avoid including the heading '## Troubleshooting'."
+    ),
+    "variants": (
+        "Write the SKILL.md 'Variants' section content for a Hermes Agent skill. "
+        "This section should: describe 2-3 common variations or specializations of this skill, "
+        "explain when to use each variant instead of the base approach, "
+        "and note any trade-offs between variants. "
+        "If the skill is already quite specialized and has few variants, explain that honestly. "
+        "Avoid including the heading '## Variants'."
+    ),
+    "related-skills": (
+        "Write the SKILL.md 'Related Skills' section content for a Hermes Agent skill. "
+        "This section should: list 3-5 other Hermes Agent skills that complement or relate to this one, "
+        "briefly explain how each related skill differs or connects, "
+        "and suggest a natural order for learning or combining these skills. "
+        "Avoid including the heading '## Related Skills'."
     ),
 }
 
