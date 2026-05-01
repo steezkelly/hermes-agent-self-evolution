@@ -308,7 +308,9 @@
     "generation_dir": "full-skill_20260501_010745",
     "generation_date": "2026-05-01",
     "size_chars": 10933,
-    "seed": "Author a detailed Hermes Agent persona: define voice, tone, response style, domain expertise, and behavioral constraints from a role description"
+    "seed": "Author a detailed Hermes Agent persona: define voice, tone, response style, domain expertise, and behavioral constraints from a role description",
+    "self_score": 0.5,
+    "note": "INCOMPARABLE - different task (generator vs catalog)"
   },
   {
     "skill_name": "design-a-multi-agent-companion-coordinat",
@@ -331,7 +333,10 @@
     "generation_dir": "full-skill_20260501_011452",
     "generation_date": "2026-05-01",
     "size_chars": 11666,
-    "seed": "Design a multi-agent companion coordination protocol: define roles, communication patterns, delegation rules, and escalation paths for a team of companion agents"
+    "seed": "Design a multi-agent companion coordination protocol: define roles, communication patterns, delegation rules, and escalation paths for a team of companion agents",
+    "self_score": 0.621,
+    "note": "Modest regression; seed skill narrower than old 11-section version",
+    "delta_vs_old_baseline": -0.11
   },
   {
     "skill_name": "github-pr-review",
@@ -354,6 +359,9 @@
     "generation_dir": "full-skill_20260501_012056",
     "generation_date": "2026-05-01",
     "size_chars": 9463,
-    "seed": "Review a GitHub pull request thoroughly: analyze the diff for bugs, security issues, and code quality problems"
+    "seed": "Review a GitHub pull request thoroughly: analyze the diff for bugs, security issues, and code quality problems",
+    "self_score": 0.578,
+    "note": "Modest regression; seed skill less comprehensive",
+    "delta_vs_old_baseline": -0.072
   }
 ]

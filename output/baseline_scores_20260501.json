@@ -1,0 +1,23 @@
+[
+  {
+    "skill": "hermes-agent-author",
+    "avg_score": 0.5004,
+    "old_baseline": 0.627,
+    "delta": -0.127,
+    "note": "NOT COMPARABLE - old skill was persona lookup catalog, new skill generates personas"
+  },
+  {
+    "skill": "design-a-multi-agent-companion-coordinat",
+    "avg_score": 0.6211,
+    "old_baseline": 0.731,
+    "delta": -0.11,
+    "note": "REAL REGRESSION - new skill less comprehensive than old"
+  },
+  {
+    "skill": "github-pr-review",
+    "avg_score": 0.578,
+    "old_baseline": 0.65,
+    "delta": -0.072,
+    "note": "MODEST REGRESSION"
+  }
+]
