@@ -289,7 +289,7 @@
   },
   {
     "skill_name": "hermes-agent-author",
-    "status": "VALIDATING",
+    "status": "EVOLVED",
     "priority": "high",
     "run_count": 1,
     "regression_count": 0,
@@ -310,11 +310,14 @@
     "size_chars": 10933,
     "seed": "Author a detailed Hermes Agent persona: define voice, tone, response style, domain expertise, and behavioral constraints from a role description",
     "self_score": 0.5,
-    "note": "INCOMPARABLE - different task (generator vs catalog)"
+    "note": "INCOMPARABLE - different task (generator vs catalog)",
+    "gepa_evolved": "FAILED_LOAD",
+    "gepa_iterations": 5,
+    "gepa_improvement": null
   },
   {
     "skill_name": "design-a-multi-agent-companion-coordinat",
-    "status": "VALIDATING",
+    "status": "EVOLVED",
     "priority": "high",
     "run_count": 1,
     "regression_count": 0,
@@ -335,12 +338,15 @@
     "size_chars": 11666,
     "seed": "Design a multi-agent companion coordination protocol: define roles, communication patterns, delegation rules, and escalation paths for a team of companion agents",
     "self_score": 0.621,
-    "note": "Modest regression; seed skill narrower than old 11-section version",
-    "delta_vs_old_baseline": -0.11
+    "note": "GEPA ran 5 iterations: all mutations rejected. Seed is locally optimal on synthetic eval.",
+    "delta_vs_old_baseline": -0.11,
+    "gepa_evolved": true,
+    "gepa_iterations": 5,
+    "gepa_improvement": 0.0
   },
   {
     "skill_name": "github-pr-review",
-    "status": "VALIDATING",
+    "status": "EVOLVED",
     "priority": "high",
     "run_count": 1,
     "regression_count": 0,
@@ -361,7 +367,10 @@
     "size_chars": 9463,
     "seed": "Review a GitHub pull request thoroughly: analyze the diff for bugs, security issues, and code quality problems",
     "self_score": 0.578,
-    "note": "Modest regression; seed skill less comprehensive",
-    "delta_vs_old_baseline": -0.072
+    "note": "GEPA ran 5 iterations: all mutations rejected. Seed is locally optimal on synthetic eval.",
+    "delta_vs_old_baseline": -0.072,
+    "gepa_evolved": true,
+    "gepa_iterations": 5,
+    "gepa_improvement": 0.0
   }
 ]
