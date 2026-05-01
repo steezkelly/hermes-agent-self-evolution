@@ -252,24 +252,6 @@
     "is_recent": false
   },
   {
-    "skill_name": "seed-generated",
-    "status": "STALE",
-    "priority": "low",
-    "run_count": 5,
-    "regression_count": 0,
-    "latest_run": "steps_20260430_180400",
-    "latest_baseline": 0.0,
-    "latest_evolved": 0.0,
-    "latest_delta": 0.0,
-    "best_delta": 0.0,
-    "best_run": "steps_20260430_180400",
-    "eval_source": "?",
-    "iterations": 5,
-    "constraints_passed": true,
-    "is_multi_run": true,
-    "is_recent": false
-  },
-  {
     "skill_name": "systematic-debugging",
     "status": "VALIDATING",
     "priority": "medium",
