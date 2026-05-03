@@ -1,0 +1,26 @@
+- **Example 1: Simple feature request**
+  - Input: "Create a way for users to reset their password via email"
+  - Output:
+    - Title: "Implement password reset via email"
+    - Description: "Users need the ability to reset their password by receiving a reset link via email. This includes designing the email template, implementing the reset flow, and setting token expiration rules."
+    - Priority: Medium
+    - Team: Backend
+    - Assignee: Unassigned
+
+- **Example 2: Bug report with context**
+  - Input: "the login button keeps crashing on mobile, saw this happen on iOS Safari around 3pm today, customers are mad"
+  - Output:
+    - Title: "Fix login button crash on mobile Safari"
+    - Description: "Users experience app crash when tapping the login button on iOS Safari. Issue reproduced around 15:00. Impact: customer-facing degradation."
+    - Priority: High
+    - Team: Frontend
+    - Assignee: Unassigned
+
+- **Example 3: Vague task requiring structured interpretation**
+  - Input: "make onboarding better"
+  - Output:
+    - Title: "Redesign user onboarding flow"
+    - Description: "Current onboarding experience needs improvement to increase activation rate. Scope includes: reduced friction in initial setup, clearer progress indicators, and better first-run tutorial."
+    - Priority: Low
+    - Team: Product
+    - Assignee: Unassigned

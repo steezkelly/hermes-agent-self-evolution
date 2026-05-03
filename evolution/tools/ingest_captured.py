@@ -208,6 +208,11 @@ def deploy_candidate(candidate_path: Path) -> tuple[bool, str]:
     data["deployed_to"] = str(target_dir / "SKILL.md")
     candidate_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
+    # Close the flywheel: add this candidate as an eval example
+    from evolution.core.dataset_builder import EvalDataset
+    output_dir = Path("datasets") / "skills" / name
+    save_as_sessiondb_example(candidate_path, output_dir)
+
     return True, f"Deployed to {target_dir / 'SKILL.md'}"
 
 
@@ -229,6 +234,139 @@ def _generate_skill_name(task: str, body: str) -> str:
         name = "captured-skill"
     return name
 
+
+# ---------------------------------------------------------------------------
+# Enricher + deterministic split (P0.2)
+# ---------------------------------------------------------------------------
+
+import hashlib
+
+
+class CapturedExampleEnricher:
+    """Convert captured skill data into a rich EvalExample."""
+
+    @staticmethod
+    def extract_rubric(task: str, body: str, tool_sequence: list[str], success_pattern: str) -> str:
+        """Rule-based rubric extraction (D2: no LLM call).
+
+        Strategy: use the first post-frontmatter section heading + body.
+        Falls back to first 500 chars of body if no clear sections.
+        """
+        rubric = ""
+        # Strip frontmatter if present
+        if '---' in body:
+            parts = body.split('---', 2)
+            body_after_fm = parts[-1] if len(parts) > 2 else body
+        else:
+            body_after_fm = body
+
+        # Split on section headings
+        sections = re.split(r'\n(?=##?\s)', body_after_fm)
+        for section in sections:
+            section = section.strip()
+            if not section:
+                continue
+            lines = section.split('\n')
+            heading = lines[0].lstrip('#').strip()
+            # Skip frontmatter-like lines
+            if heading.lower().startswith('name:') or heading.lower().startswith('description:'):
+                continue
+            # Use body under first real heading, capped at 800 chars
+            body_text = "\n".join(lines[1:]).strip()
+            if body_text:
+                rubric = body_text[:800]
+                break
+
+        if not rubric:
+            rubric = body[:500]
+
+        parts = [
+            f"Task: {task}",
+            f"Expected tools: {', '.join(tool_sequence)}",
+            f"Success pattern: {success_pattern}",
+        ]
+        if rubric:
+            parts.append(f"Procedure: {rubric}")
+        return "\n\n".join(parts)
+
+    @classmethod
+    def enrich(cls, data: dict) -> "EvalDataset":
+        from evolution.core.dataset_builder import EvalExample
+        task = data.get("task", "")
+        body = data.get("skill_body", "")
+        tool_sequence = data.get("tool_sequence", [])
+        success_pattern = data.get("success_pattern", "")
+        total_tools = data.get("total_tool_calls", 0)
+        tags = data.get("domain_tags", [])
+
+        difficulty = "easy" if total_tools <= 2 else "medium" if total_tools <= 5 else "hard"
+
+        return EvalExample(
+            task_input=task,
+            expected_behavior=cls.extract_rubric(task, body, tool_sequence, success_pattern),
+            difficulty=difficulty,
+            category=tags[0] if tags else "captured",
+            source="captured",
+            tool_sequence=tool_sequence,
+            complexity_score=total_tools,
+            session_id=data.get("session_id", ""),
+            success_pattern=success_pattern,
+        )
+
+
+def assign_split(task_input: str) -> str:
+    """Assign an example to exactly one split deterministically (D1)."""
+    h = int(hashlib.md5(task_input.encode()).hexdigest(), 16)
+    return ["train", "val", "holdout"][h % 3]
+
+
+# ---------------------------------------------------------------------------
+# SessionDB flywheel (P0.3)
+# ---------------------------------------------------------------------------
+
+def enrich_and_merge(candidate_path: Path, output_dir: Path) -> dict:
+    """Convert a captured candidate to rich EvalExample and merge into dataset.
+
+    Fixes:
+    - Gap B (data leakage): deterministic single split via assign_split()
+    - Gap C (rubric mismatch): rule-based rubric via CapturedExampleEnricher
+    - Gap F (field loss): preserves tool_sequence, complexity_score, session_id
+    """
+    from evolution.core.dataset_builder import EvalDataset, EvalExample
+
+    # 1. Load candidate
+    data = json.loads(candidate_path.read_text())
+
+    # 2. Enrich
+    enriched = CapturedExampleEnricher.enrich(data)
+
+    # 3. Assign to exactly one split
+    split = assign_split(enriched.task_input)
+
+    # 4. Load existing dataset (or create new)
+    dataset = EvalDataset.load(output_dir) if output_dir.exists() else EvalDataset()
+
+    # 5. Deduplicate: skip if same task_input already exists in ANY split
+    seen = {ex.task_input for ex in dataset.all_examples}
+    if enriched.task_input in seen:
+        return {"status": "skipped", "reason": "duplicate task_input", "split": split}
+
+    # 6. Append to target split
+    target_list = getattr(dataset, split)
+    target_list.append(enriched)
+
+    # 7. Atomic save
+    dataset.save_atomic(output_dir)
+
+    return {"status": "merged", "split": split, "task_input": enriched.task_input[:80]}
+
+
+def save_as_sessiondb_example(candidate_path: Path, output_dir: Path) -> None:
+    """DEPRECATED: Use enrich_and_merge() instead.
+
+    Kept for backward compatibility during transition.
+    """
+    return enrich_and_merge(candidate_path, output_dir)
 
 # ---------------------------------------------------------------------------
 # Evolve integration
@@ -286,10 +424,13 @@ def evolve_and_deploy(candidate_path: Path, iterations: int = 5) -> tuple[bool, 
             candidate_skill_dir.mkdir(parents=True, exist_ok=True)
             (candidate_skill_dir / "SKILL.md").write_text(temp_skill)
 
+        output_dir = Path("datasets") / "skills" / name
+        use_golden = (output_dir / "train.jsonl").exists()
         report = v2_dispatch(
             skill_name=name,
             iterations=iterations,
-            eval_source="synthetic",
+            eval_source="golden" if use_golden else "synthetic",
+            dataset_path=str(output_dir) if use_golden else None,
             run_tests=False,
         )
 

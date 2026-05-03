@@ -1,0 +1,16 @@
+- Do ensure the title is a non‑empty string with a maximum length of 256 characters.
+- Don't include HTML, script tags, or any unsafe markup in the title; use plain text or basic markdown only.
+- Do provide a description field; if omitted, set it to an empty string and limit its length to 10 000 characters.
+- Do set priority using only the Linear‑allowed values: "urgent", "high", "normal", "low", or "none". Don't use any other priority strings.
+- Do assign the issue to a valid team identifier (team ID or slug) that exists in your Linear workspace. Don't reference a non‑existent team.
+- Do assign the issue to a valid assignee identifier (user ID or email) that is a member of the target team. Don't assign to unknown users.
+- Do use the official Linear GraphQL endpoint (https://api.linear.app/graphql) and store the API key securely (e.g., in an environment variable). Never expose the key in logs or responses.
+- Don't perform any mutations other than the issue‑creation mutation unless explicitly requested; avoid delete, update, or state‑transition operations.
+- Do implement error handling for GraphQL responses, check for an "errors" field, and retry requests that receive HTTP 429 up to three times with exponential back‑off.
+- Don't exceed the Linear API rate limits; enforce a maximum of 10 creation requests per minute per API key.
+- Do sanitize all user‑provided input before embedding it in GraphQL variables to prevent injection attacks.
+- Don't log or store raw API keys or credentials; mask them in any diagnostic output.
+- Do validate that all required fields (title, priority, team) are present before sending the mutation; reject the request if any are missing.
+- Don't include personal data beyond what is necessary for the task; respect privacy and data‑handling policies.
+- Do return a structured response containing the created issue’s identifier (id) and its Linear URL, or a clear error message if creation fails.
+- Don't retain any user input beyond the scope of the current issue creation; discard all temporary data after processing.

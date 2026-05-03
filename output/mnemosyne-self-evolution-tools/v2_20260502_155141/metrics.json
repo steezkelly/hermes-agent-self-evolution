@@ -1,0 +1,27 @@
+{
+  "skill_name": "mnemosyne-self-evolution-tools",
+  "timestamp": "20260502_155141",
+  "iterations": 5,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "optimizer_type": "GEPA",
+  "eval_model": "minimax/minimax-m2.7",
+  "eval_source": "golden",
+  "baseline_score": 0.0,
+  "evolved_score": 0.0,
+  "improvement": 0.0,
+  "baseline_size": 4410,
+  "evolved_size": 4410,
+  "train_examples": 10,
+  "val_examples": 5,
+  "holdout_examples": 5,
+  "elapsed_seconds": 0.5,
+  "constraints_passed": true,
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": false,
+    "scope_status": "match",
+    "regression_passed": null,
+    "pareto_source": null,
+    "router_action": "extend"
+  }
+}

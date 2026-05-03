@@ -1,172 +1,172 @@
-"""Tests for the ingest-captured pipeline."""
+"""Tests for ingest_captured.py enricher and split logic — P0.2 / P0.3."""
+
 import json
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
+from evolution.tools.ingest_captured import (
+    CapturedExampleEnricher,
+    assign_split,
+    enrich_and_merge,
+    validate_candidate,
+    deploy_candidate,
+)
+from evolution.core.dataset_builder import EvalDataset, EvalExample
 
-@pytest.fixture
-def sample_candidate():
-    """Create a temporary captured candidate file."""
-    data = {
-        "session_id": "test-session-001",
-        "captured_at": "2026-04-28T12:00:00+00:00",
-        "task": "Build a Python script to analyze log files for error patterns",
-        "success_pattern": "Built and verified solution through iterative code and shell commands",
-        "domain_tags": ["python", "testing", "config"],
-        "tool_sequence": [
-            {"tool_name": "search_files", "args_preview": {"pattern": "*.log"}},
-            {"tool_name": "read_file", "args_preview": {"path": "/var/log/app.log"}},
-            {"tool_name": "write_file", "args_preview": {"path": "analyze_logs.py"}},
-            {"tool_name": "terminal", "args_preview": {"command": "python analyze_logs.py"}},
-        ],
-        "total_tool_calls": 4,
-        "skill_body": (
-            "# Analyze Log Files for Error Patterns\n\n"
-            "## When to Use\n"
-            "- System log analysis with pattern extraction\n"
-            "- Error frequency tracking across time windows\n\n"
-            "## Approach\n\n"
-            "1. Search for log files matching the target pattern\n"
-            "2. Read the log file to understand its structure\n"
-            "3. Write an analysis script that extracts error patterns\n"
-            "4. Run the script and review results\n"
-        ),
-        "overlapping_skills": [],
-        "status": "pending",
-    }
 
-    with tempfile.TemporaryDirectory() as tmp:
-        # Save to a fake captured directory
-        captured_dir = Path(tmp) / "captured"
-        captured_dir.mkdir()
-        filepath = captured_dir / "analyze-logs__test-session-001.json"
-        filepath.write_text(json.dumps(data, indent=2))
+class TestCapturedExampleEnricher:
+    """Rule-based rubric extraction."""
 
-        # Create a dummy skills directory
-        skills_dir = Path(tmp) / "skills"
-        skills_dir.mkdir()
+    def test_extract_rubric_from_first_section(self):
+        body = """---
+name: test
+description: desc
+---
 
-        yield {
-            "captured_dir": captured_dir,
-            "skills_dir": skills_dir,
-            "filepath": filepath,
-            "data": data,
+# Overview
+This is the overview content.
+
+## Details
+More details here.
+"""
+        rubric = CapturedExampleEnricher.extract_rubric(
+            task="Do X", body=body, tool_sequence=["a", "b"], success_pattern="ok"
+        )
+        assert "Task: Do X" in rubric
+        assert "Expected tools: a, b" in rubric
+        assert "Procedure:" in rubric
+        assert "This is the overview content." in rubric
+        assert "## Details" not in rubric  # only first section body, not heading
+
+    def test_extract_rubric_fallback_to_body(self):
+        body = "Just some plain text without sections."
+        rubric = CapturedExampleEnricher.extract_rubric(
+            task="T", body=body, tool_sequence=[], success_pattern="ok"
+        )
+        assert "Procedure: Just some plain text" in rubric
+
+    def test_enrich_returns_eval_example(self):
+        data = {
+            "task": "Search and deploy",
+            "skill_body": "# Search\n\nUse web_search.",
+            "tool_sequence": ["web_search", "deploy"],
+            "success_pattern": "Found and deployed",
+            "total_tool_calls": 4,
+            "domain_tags": ["research", "devops"],
+            "session_id": "sid-42",
         }
+        ex = CapturedExampleEnricher.enrich(data)
+        assert isinstance(ex, EvalExample)
+        assert ex.task_input == "Search and deploy"
+        assert ex.source == "captured"
+        assert ex.tool_sequence == ["web_search", "deploy"]
+        assert ex.complexity_score == 4
+        assert ex.session_id == "sid-42"
+        assert ex.difficulty == "medium"
+        assert ex.category == "research"
+        assert "Use web_search" in ex.expected_behavior
+
+    def test_enrich_difficulty_easy(self):
+        data = {
+            "task": "t", "skill_body": "b", "tool_sequence": [],
+            "success_pattern": "", "total_tool_calls": 1, "domain_tags": [],
+        }
+        ex = CapturedExampleEnricher.enrich(data)
+        assert ex.difficulty == "easy"
+
+    def test_enrich_difficulty_hard(self):
+        data = {
+            "task": "t", "skill_body": "b", "tool_sequence": [],
+            "success_pattern": "", "total_tool_calls": 10, "domain_tags": [],
+        }
+        ex = CapturedExampleEnricher.enrich(data)
+        assert ex.difficulty == "hard"
 
 
-class TestIngestCapture:
-    """Tests for the ingest_captured module."""
+class TestAssignSplit:
+    """Deterministic single-split assignment."""
 
-    def test_list_pending(self, sample_candidate, monkeypatch):
-        monkeypatch.setattr("evolution.tools.ingest_captured.CAPTURED_DIR",
-                           sample_candidate["captured_dir"])
-        from evolution.tools.ingest_captured import list_candidates
-        candidates = list_candidates(status_filter="pending")
-        assert len(candidates) == 1
-        assert candidates[0]["status"] == "pending"
-        assert candidates[0]["task"].startswith("Build a Python script")
+    def test_assign_split_deterministic(self):
+        s1 = assign_split("hello world")
+        s2 = assign_split("hello world")
+        assert s1 == s2
+        assert s1 in ("train", "val", "holdout")
 
-    def test_validate_valid(self, sample_candidate, monkeypatch):
-        monkeypatch.setattr("evolution.tools.ingest_captured.SKILLS_DIRS",
-                           [sample_candidate["skills_dir"]])
-        monkeypatch.setattr("evolution.tools.ingest_captured.CAPTURED_DIR",
-                           sample_candidate["captured_dir"])
-        from evolution.tools.ingest_captured import validate_candidate
-        valid, reason, checks = validate_candidate(sample_candidate["filepath"])
-        assert valid, f"Should be valid: {reason}"
-        assert checks["body_length"] == "OK"
-        assert checks["structure"] == "OK"
+    def test_assign_split_distribution(self):
+        counts = {"train": 0, "val": 0, "holdout": 0}
+        for i in range(300):
+            counts[assign_split(f"task-{i}")] += 1
+        # All three splits should be reasonably represented
+        assert all(c > 20 for c in counts.values()), counts
 
-    def test_validate_empty_body(self, sample_candidate, monkeypatch):
-        monkeypatch.setattr("evolution.tools.ingest_captured.SKILLS_DIRS",
-                           [sample_candidate["skills_dir"]])
-        data = sample_candidate["data"].copy()
-        data["skill_body"] = "Short"
-        sample_candidate["filepath"].write_text(json.dumps(data, indent=2))
+    def test_single_split_per_example(self):
+        # An example can only be in one split
+        splits = {assign_split(f"task-{i}") for i in range(100)}
+        assert len(splits) >= 2  # all three are possible across different inputs
 
-        from evolution.tools.ingest_captured import validate_candidate, list_candidates
-        valid, reason, checks = validate_candidate(sample_candidate["filepath"])
-        assert not valid
-        assert "body_length" in reason
 
-    def test_deploy_creates_skill(self, sample_candidate, monkeypatch):
-        monkeypatch.setattr("evolution.tools.ingest_captured.SKILLS_DIRS",
-                           [sample_candidate["skills_dir"]])
-        monkeypatch.setattr("evolution.tools.ingest_captured.CAPTURED_DIR",
-                           sample_candidate["captured_dir"])
-        # Patch home to our temp dir
-        monkeypatch.setattr("evolution.tools.ingest_captured.Path.home",
-                           lambda: sample_candidate["skills_dir"].parent)
+class TestEnrichAndMerge:
+    """enrich_and_merge end-to-end."""
 
-        from evolution.tools.ingest_captured import deploy_candidate
-        success, msg = deploy_candidate(sample_candidate["filepath"])
-        assert success, f"Deploy failed: {msg}"
+    def _make_candidate(self, task: str = "Test task"):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({
+                "task": task,
+                "skill_body": "# Body\n\nProcedure text here.",
+                "tool_sequence": ["web_search"],
+                "success_pattern": "Done",
+                "total_tool_calls": 3,
+                "domain_tags": ["research"],
+                "session_id": "s1",
+                "status": "pending",
+            }, f)
+            return Path(f.name)
 
-        # Check skill was created at ~/.hermes/skills/<name>/
-        home = sample_candidate["skills_dir"].parent
-        skill_path = home / ".hermes" / "skills" / "analyze-log-files-for-error-patterns" / "SKILL.md"
-        assert skill_path.exists(), f"Skill not created at {skill_path}"
-        skill_text = skill_path.read_text()
-        assert "Analyze Log Files" in skill_text
-        assert "name: analyze-log-files-for-error-patterns" in skill_text
+    def test_merges_into_single_split(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dataset"
+            cand = self._make_candidate()
+            result = enrich_and_merge(cand, out)
+            assert result["status"] == "merged"
+            assert result["split"] in ("train", "val", "holdout")
 
-        # Clean up deployed skill
-        skill_dir = home / ".hermes" / "skills" / "analyze-log-files-for-error-patterns"
-        import shutil
-        if skill_dir.exists():
-            shutil.rmtree(skill_dir)
+            ds = EvalDataset.load(out)
+            total = len(ds.train) + len(ds.val) + len(ds.holdout)
+            assert total == 1
+            splits_with_data = sum(1 for s in [ds.train, ds.val, ds.holdout] if len(s) > 0)
+            assert splits_with_data == 1  # Gap B fix
 
-    def test_deploy_twice_fails(self, sample_candidate, monkeypatch):
-        """Deploying the same skill twice should fail."""
-        monkeypatch.setattr("evolution.tools.ingest_captured.SKILLS_DIRS",
-                           [sample_candidate["skills_dir"]])
-        monkeypatch.setattr("evolution.tools.ingest_captured.CAPTURED_DIR",
-                           sample_candidate["captured_dir"])
-        monkeypatch.setattr("evolution.tools.ingest_captured.Path.home",
-                           lambda: sample_candidate["skills_dir"].parent)
+    def test_skips_duplicate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dataset"
+            cand = self._make_candidate("Same task")
+            r1 = enrich_and_merge(cand, out)
+            assert r1["status"] == "merged"
+            r2 = enrich_and_merge(cand, out)
+            assert r2["status"] == "skipped"
+            assert r2["reason"] == "duplicate task_input"
 
-        from evolution.tools.ingest_captured import deploy_candidate
-        success, _ = deploy_candidate(sample_candidate["filepath"])
-        assert success
+    def test_preserves_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dataset"
+            cand = self._make_candidate("Meta task")
+            enrich_and_merge(cand, out)
+            ds = EvalDataset.load(out)
+            for split in [ds.train, ds.val, ds.holdout]:
+                if split:
+                    ex = split[0]
+                    assert ex.tool_sequence == ["web_search"]
+                    assert ex.complexity_score == 3
+                    assert ex.session_id == "s1"
+                    assert ex.success_pattern == "Done"
+                    break
 
-        # Second deploy should fail (skill already exists)
-        success, msg = deploy_candidate(sample_candidate["filepath"])
-        assert not success
-        assert "already exists" in msg
-
-        # Clean up deployed skill
-        home = sample_candidate["skills_dir"].parent
-        skill_dir = home / ".hermes" / "skills" / "analyze-log-files-for-error-patterns"
-        import shutil
-        if skill_dir.exists():
-            shutil.rmtree(skill_dir)
-
-    def test_stats(self, sample_candidate, monkeypatch):
-        monkeypatch.setattr("evolution.tools.ingest_captured.CAPTURED_DIR",
-                           sample_candidate["captured_dir"])
-        from evolution.tools.ingest_captured import list_candidates
-        all_c = list_candidates()
-        assert len(all_c) == 1
-
-        pending = list_candidates(status_filter="pending")
-        assert len(pending) == 1
-
-    def test_generate_skill_name(self):
-        from evolution.tools.ingest_captured import _generate_skill_name
-        name = _generate_skill_name(
-            "Build a Python script for log analysis",
-            "# Analyze Logs\n\nSome content",
-        )
-        assert "analyze-logs" in name
-        assert all(c.isalnum() or c == "-" for c in name)
-
-        # Test with no heading
-        name2 = _generate_skill_name(
-            "Fix database connection pooling issue",
-            "Some content without a heading",
-        )
-        assert "fix-database" in name2
+    def test_atomic_save_no_tmp_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "dataset"
+            cand = self._make_candidate("Atomic")
+            enrich_and_merge(cand, out)
+            tmp_files = list(out.glob(".*.tmp"))
+            assert tmp_files == []

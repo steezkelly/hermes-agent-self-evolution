@@ -1,0 +1,11 @@
+{
+  "seed": "Review a GitHub pull request thoroughly: analyze the diff for bugs, security issues, performance problems, and write constructive inline comments via the GitHub API",
+  "target_section": "troubleshooting",
+  "iterations": 2,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "eval_model": "minimax/minimax-m2.7",
+  "n_examples": 5,
+  "timestamp": "20260501_161049",
+  "chars": 3038,
+  "dry_run": false
+}

@@ -7,7 +7,10 @@ C) Golden sets — hand-curated JSONL files
 """
 
 import ast
+import dataclasses
+import hashlib
 import json
+import os
 import random
 import re
 from pathlib import Path
@@ -22,31 +25,20 @@ from evolution.core.nous_auth import _get_lm_kwargs
 
 
 def _try_parse_json(text: str) -> list:
-    """Parse JSON with multiple fallback strategies for LLM output.
-
-    LLMs frequently produce malformed JSON: trailing commas, single quotes,
-    text wrapped in markdown fences, etc. This tries progressively more
-    aggressive fixes before giving up.
-    """
+    """Parse JSON with multiple fallback strategies for LLM output."""
     text = text.strip()
-
-    # Strategy 1: Direct parse
     try:
         result = json.loads(text)
         if isinstance(result, list):
             return result
     except json.JSONDecodeError:
         pass
-
-    # Strategy 2: Python literal_eval — handles single-quoted dicts/strings
     try:
         result = ast.literal_eval(text)
         if isinstance(result, list):
             return result
     except (ValueError, SyntaxError):
         pass
-
-    # Strategy 3: Extract JSON array from surrounding text
     match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
     if match:
         try:
@@ -55,17 +47,12 @@ def _try_parse_json(text: str) -> list:
                 return result
         except json.JSONDecodeError:
             pass
-
-    # Strategy 4: Try literal_eval on extracted candidate
-    if match:
         try:
             result = ast.literal_eval(match.group())
             if isinstance(result, list):
                 return result
         except (ValueError, SyntaxError):
             pass
-
-    # Strategy 5: Fix trailing commas, then parse
     fixed = re.sub(r',\s*([}\]])', r'\1', text)
     fixed = re.sub(r"(?<!')\'([^']+?)'(?=\s*[:,\]\}])", r'"\1"', fixed)
     try:
@@ -74,8 +61,6 @@ def _try_parse_json(text: str) -> list:
             return result
     except json.JSONDecodeError:
         pass
-
-    # Strategy 6: Strip markdown code fences
     stripped = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
     stripped = re.sub(r'\s*```$', '', stripped)
     try:
@@ -84,8 +69,6 @@ def _try_parse_json(text: str) -> list:
             return result
     except json.JSONDecodeError:
         pass
-
-    # Last resort: extract all {...} blocks and try each
     for block_match in re.finditer(r'\{[^{}]*\}', text):
         try:
             result = json.loads(block_match.group())
@@ -93,18 +76,46 @@ def _try_parse_json(text: str) -> list:
                 return result
         except json.JSONDecodeError:
             continue
-
+    if text.strip().startswith('['):
+        import re as _re
+        m = _re.search(r'\}[,\]]', text)
+        if m:
+            truncated = text[:m.end()]
+            try:
+                result = json.loads(truncated)
+                if isinstance(result, list) and len(result) > 0:
+                    return result
+            except json.JSONDecodeError:
+                pass
+            try:
+                result = json.loads(truncated)
+                if isinstance(result, dict):
+                    return [result]
+            except json.JSONDecodeError:
+                pass
+        for obj_match in _re.finditer(r'\{[^{}]*\}', text):
+            try:
+                result = json.loads(obj_match.group())
+                if isinstance(result, dict) and 'task_input' in result and 'expected_behavior' in result:
+                    return [result]
+            except json.JSONDecodeError:
+                continue
     return None
 
 
 @dataclass
 class EvalExample:
     """A single evaluation example."""
-    task_input: str  # What the user asks
-    expected_behavior: str  # Rubric — what a good response looks like
-    difficulty: str = "medium"  # easy, medium, hard
-    category: str = "general"  # Category for stratified eval
-    source: str = "synthetic"  # synthetic, sessiondb, golden
+    task_input: str
+    expected_behavior: str
+    difficulty: str = "medium"
+    category: str = "general"
+    source: str = "synthetic"
+    # NEW: captured-session metadata (P0.1)
+    tool_sequence: list[str] = field(default_factory=list)
+    complexity_score: int = 0
+    session_id: str = ""
+    success_pattern: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -113,11 +124,25 @@ class EvalExample:
             "difficulty": self.difficulty,
             "category": self.category,
             "source": self.source,
+            "tool_sequence": self.tool_sequence,
+            "complexity_score": self.complexity_score,
+            "session_id": self.session_id,
+            "success_pattern": self.success_pattern,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "EvalExample":
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+        # Backward compatibility: old JSONL files may lack new fields
+        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
+        for field_name, field_obj in cls.__dataclass_fields__.items():
+            if field_name not in kwargs:
+                if field_obj.default is not dataclasses.MISSING:
+                    kwargs[field_name] = field_obj.default
+                elif field_obj.default_factory is not dataclasses.MISSING:
+                    kwargs[field_name] = field_obj.default_factory()
+                else:
+                    kwargs[field_name] = None
+        return cls(**kwargs)
 
 
 @dataclass
@@ -139,6 +164,17 @@ class EvalDataset:
                 for ex in split_data:
                     f.write(json.dumps(ex.to_dict()) + "\n")
 
+    def save_atomic(self, path: Path):
+        """Atomic save: write to temp file, then rename (P0.1)."""
+        path.mkdir(parents=True, exist_ok=True)
+        for split_name, split_data in [("train", self.train), ("val", self.val), ("holdout", self.holdout)]:
+            target = path / f"{split_name}.jsonl"
+            tmp = path / f".{split_name}.jsonl.tmp"
+            with open(tmp, "w") as f:
+                for ex in split_data:
+                    f.write(json.dumps(ex.to_dict()) + "\n")
+            os.replace(tmp, target)
+
     @classmethod
     def load(cls, path: Path) -> "EvalDataset":
         """Load dataset splits from JSONL files."""
@@ -154,6 +190,27 @@ class EvalDataset:
                 setattr(dataset, split_name, examples)
         return dataset
 
+    def merge(self, other: "EvalDataset") -> dict:
+        """Merge another dataset into self, deduping by task_input (P0.1)."""
+        seen = {ex.task_input for ex in self.all_examples}
+        added = {"train": 0, "val": 0, "holdout": 0}
+        for ex in other.train:
+            if ex.task_input not in seen:
+                self.train.append(ex)
+                seen.add(ex.task_input)
+                added["train"] += 1
+        for ex in other.val:
+            if ex.task_input not in seen:
+                self.val.append(ex)
+                seen.add(ex.task_input)
+                added["val"] += 1
+        for ex in other.holdout:
+            if ex.task_input not in seen:
+                self.holdout.append(ex)
+                seen.add(ex.task_input)
+                added["holdout"] += 1
+        return added
+
     def to_dspy_examples(self, split: str = "train") -> list[dspy.Example]:
         """Convert a split to DSPy Example objects."""
         data = getattr(self, split)
@@ -167,22 +224,10 @@ class EvalDataset:
 
 
 class SyntheticDatasetBuilder:
-    """Generate evaluation datasets using a strong LLM.
-
-    Reads the target artifact (skill file, tool description, etc.)
-    and generates realistic (task_input, expected_behavior) pairs.
-    """
+    """Generate evaluation datasets using a strong LLM."""
 
     class GenerateTestCases(dspy.Signature):
-        """Generate realistic evaluation test cases for an agent skill or tool.
-
-        Given the full text of a skill/tool description, generate diverse test cases
-        that would exercise different aspects of the skill. Each test case should include:
-        - A realistic task_input (what a user would actually ask)
-        - An expected_behavior rubric (what a good response should contain/do, NOT exact text)
-        - A difficulty level (easy, medium, hard)
-        - A category (what aspect of the skill this tests)
-        """
+        """Generate realistic evaluation test cases for an agent skill or tool."""
         artifact_text: str = dspy.InputField(desc="The full text of the skill/tool/prompt being tested")
         artifact_type: str = dspy.InputField(desc="Type: 'skill', 'tool_description', or 'prompt_section'")
         num_cases: int = dspy.InputField(desc="Number of test cases to generate")
@@ -199,26 +244,31 @@ class SyntheticDatasetBuilder:
         num_cases: Optional[int] = None,
     ) -> EvalDataset:
         """Generate a full eval dataset with train/val/holdout splits."""
-
         n = num_cases or self.config.eval_dataset_size
-
-        # Configure DSPy to use the judge model for generation
         lm_kwargs, judge_model_used = _get_lm_kwargs(self.config.judge_model)
         lm_kwargs["num_retries"] = 8
         lm = dspy.LM(judge_model_used, **lm_kwargs)
-
         with dspy.context(lm=lm):
             result = self.generator(
                 artifact_text=artifact_text,
                 artifact_type=artifact_type,
                 num_cases=n,
             )
-
-        # Parse the generated test cases using robust multi-strategy parser
         cases_raw = _try_parse_json(result.test_cases)
         if cases_raw is None:
-            raise ValueError(f"Could not parse test cases from LLM output: {result.test_cases[:500]}")
-
+            print(f"[dataset_builder] Truncated output, retrying with {max(3, n//2)} cases...")
+            lm_kwargs2, judge_model_used2 = _get_lm_kwargs(self.config.judge_model)
+            lm_kwargs2["num_retries"] = 8
+            lm2 = dspy.LM(judge_model_used2, **lm_kwargs2)
+            with dspy.context(lm=lm2):
+                result2 = self.generator(
+                    artifact_text=artifact_text,
+                    artifact_type=artifact_type,
+                    num_cases=max(3, n // 2),
+                )
+            cases_raw = _try_parse_json(result2.test_cases)
+            if cases_raw is None:
+                raise ValueError(f"Could not parse test cases from LLM output (after retry): {result2.test_cases[:500]}")
         examples = [
             EvalExample(
                 task_input=c.get("task_input", ""),
@@ -230,13 +280,10 @@ class SyntheticDatasetBuilder:
             for c in cases_raw
             if c.get("task_input") and c.get("expected_behavior")
         ]
-
-        # Shuffle and split
         random.shuffle(examples)
         n_total = len(examples)
         n_train = max(1, int(n_total * self.config.train_ratio))
         n_val = max(1, int(n_total * self.config.val_ratio))
-
         return EvalDataset(
             train=examples[:n_train],
             val=examples[n_train:n_train + n_val],
@@ -252,23 +299,18 @@ class GoldenDatasetLoader:
         """Load a golden dataset. If no splits exist, auto-split the single file."""
         if (path / "train.jsonl").exists():
             return EvalDataset.load(path)
-
-        # Single file — auto-split
         golden_file = path if path.suffix == ".jsonl" else path / "golden.jsonl"
         if not golden_file.exists():
             raise FileNotFoundError(f"No golden dataset found at {golden_file}")
-
         examples = []
         with open(golden_file) as f:
             for line in f:
                 if line.strip():
                     examples.append(EvalExample.from_dict(json.loads(line)))
-
         random.shuffle(examples)
         n = len(examples)
         n_train = max(1, int(n * 0.5))
         n_val = max(1, int(n * 0.25))
-
         return EvalDataset(
             train=examples[:n_train],
             val=examples[n_train:n_train + n_val],

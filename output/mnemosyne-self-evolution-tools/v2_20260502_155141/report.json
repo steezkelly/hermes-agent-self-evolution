@@ -1,0 +1,26 @@
+{
+  "skill_name": "mnemosyne-self-evolution-tools",
+  "iterations_executed": 3,
+  "improvement": 0.0,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.000 (baseline: 0.000)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.0,
+  "baseline_score": 0,
+  "elapsed_seconds": 0.5,
+  "attempt_metrics": [],
+  "posthoc": null,
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": false,
+    "scope_status": "match",
+    "regression_passed": null,
+    "pareto_source": null,
+    "router_action": "extend"
+  }
+}

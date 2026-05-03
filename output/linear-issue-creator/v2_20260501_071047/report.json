@@ -1,0 +1,68 @@
+{
+  "skill_name": "linear-issue-creator",
+  "iterations_executed": 3,
+  "improvement": 0.05434588803009843,
+  "recommendation": "deploy",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.666 (baseline: 0.703)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 0.3,
+    "rationale": "Budget nearly exhausted, no clear pattern \u2014 extending by default"
+  },
+  "best_score": 0.6657315053367684,
+  "baseline_score": 0.703030303030303,
+  "elapsed_seconds": 2445.0,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.61138561730667,
+      "avg_evolved": 0.6657315053367684,
+      "improvement": 0.05434588803009843
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.61138561730667,
+      "avg_evolved": 0.6657315053367684,
+      "improvement": 0.05434588803009843
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.61138561730667,
+      "avg_evolved": 0.6657315053367684,
+      "improvement": 0.05434588803009843
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0607,
+      "scale_a": 0.6211,
+      "offset_b": 0.0,
+      "r_squared": 0.7664,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "diminishing_returns",
+      "phase_confidence": 0.6965,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.7047,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.0092
+    },
+    "raw_scores": [
+      0.61138561730667,
+      0.6657315053367684,
+      0.6657315053367684,
+      0.6657315053367684
+    ],
+    "filtered_scores": [
+      0.61138561730667,
+      0.6657315053367684,
+      0.6657315053367684,
+      0.6657315053367684
+    ],
+    "recommended_action": "wind_down",
+    "summary": "Analyzed 4 iterations: scores from 0.611 to 0.666 | Power-law fit: score = 0.6211 * iter^0.0607 + 0.0 (R\u00b2=0.7664, converged) | Phase: diminishing_returns (confidence: 0.70) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  }
+}

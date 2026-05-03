@@ -1,0 +1,76 @@
+{
+  "skill_name": "mnemosyne-self-evolution-tools",
+  "iterations_executed": 3,
+  "improvement": 0.041403424930306576,
+  "recommendation": "deploy",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.607 (baseline: 0.533)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 1.0,
+    "rationale": "All scenarios pass \u2014 extending by default"
+  },
+  "best_score": 0.6065949820788531,
+  "baseline_score": 0.5333333333333333,
+  "elapsed_seconds": 500.7,
+  "attempt_metrics": [
+    {
+      "attempt": 1,
+      "avg_baseline": 0.6065949820788531,
+      "avg_evolved": 0.6479984070091597,
+      "improvement": 0.041403424930306576
+    },
+    {
+      "attempt": 2,
+      "avg_baseline": 0.6065949820788531,
+      "avg_evolved": 0.6065949820788531,
+      "improvement": 0.0
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.6065949820788531,
+      "avg_evolved": 0.6065949820788531,
+      "improvement": 0.0
+    }
+  ],
+  "posthoc": {
+    "power_law": {
+      "exponent_c": 0.0474,
+      "scale_a": 0.6139,
+      "offset_b": 0.0,
+      "r_squared": 0.7686,
+      "n_points": 4,
+      "convergence": "converged"
+    },
+    "phase": {
+      "phase": "plateau",
+      "phase_confidence": 0.5,
+      "crossover_iteration": 5,
+      "predicted_score_at_double": 0.6775,
+      "recommended_stop": 5,
+      "marginal_gain_at_stop": 0.007
+    },
+    "raw_scores": [
+      0.6065949820788531,
+      0.6479984070091597,
+      0.6479984070091597,
+      0.6479984070091597
+    ],
+    "filtered_scores": [
+      0.6065949820788531,
+      0.6479984070091597,
+      0.6479984070091597,
+      0.6479984070091597
+    ],
+    "recommended_action": "stop",
+    "summary": "Analyzed 4 iterations: scores from 0.607 to 0.648 | Power-law fit: score = 0.6139 * iter^0.0474 + 0.0 (R\u00b2=0.7686, converged) | Phase: plateau (confidence: 0.50) | Recommended stop: iteration 5 (crossover when marginal gain < 3%)"
+  },
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": true,
+    "scope_status": "match",
+    "regression_passed": true,
+    "pareto_source": "baseline",
+    "router_action": "extend"
+  }
+}

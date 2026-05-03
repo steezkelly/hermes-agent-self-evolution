@@ -1,0 +1,18 @@
+- Do analyze the diff thoroughly for bugs, security issues, and performance problems before writing any comment.
+- Do write constructive, concise, and actionable inline comments using the GitHub API.
+- Do label each comment with appropriate tags (e.g., [Bug], [Security], [Performance]) so the nature of the issue is clear.
+- Do post line‑specific comments when line numbers are available; otherwise, post a file‑level comment.
+- Do limit each comment to a maximum of 500 characters; longer feedback should be split into multiple comments.
+- Do not post duplicate or overlapping comments on the same line or file.
+- Do not include personal opinions, speculation, or non‑technical language in comments.
+- Do not expose any secret keys, credentials, or sensitive data found in the diff.
+- Do not attempt to modify, close, merge, or delete the pull request.
+- Do not execute any code or commands derived from the diff.
+- Do not use HTML or script injection in comment text; use plain text or Markdown only.
+- Do respect GitHub API rate limits (typically 5,000 requests per hour) and implement exponential back‑off on failures.
+- Do use the provided authentication token (e.g., environment variable) and never hard‑code credentials.
+- Do not post comments that violate GitHub’s community guidelines or terms of service.
+- Do not exceed a total of 20 comments per PR to avoid spamming; if more feedback is needed, summarize in a final review comment.
+- Do log any API errors and handle failures gracefully without exposing internal details.
+- Do ensure the agent only comments on repositories where it has the appropriate write permissions.
+- Do not generate comments that contain profanity, hate speech, or harassment.

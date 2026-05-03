@@ -34,6 +34,7 @@ from evolution.core.constraints_v2 import (
     ConfigDriftChecker,
     SkillRegressionChecker,
     ScopeCreepChecker,
+    PurposePreservationChecker,
 )
 from evolution.core.posthoc_analyzer import PostHocAnalyzer
 from evolution.skills.evolve_skill import evolve as v1_evolve
@@ -193,6 +194,7 @@ def v2_dispatch(
     config_drift = ConfigDriftChecker()
     regression = SkillRegressionChecker()
     scope = ScopeCreepChecker()
+    purpose_check = PurposePreservationChecker()
     posthoc = PostHocAnalyzer(min_improvement_delta=0.03)
 
     best_body = baseline_body
@@ -203,7 +205,18 @@ def v2_dispatch(
     attempt = 0
     scenario_results = []
 
+    # ── v2 constraint tracking (accumulates across backtrack attempts) ────
+    drift_ok_final = None
+    purpose_ok_final = None
+    scope_status_final = "match"
+    reg_ok_final = None
+    pareto_source_final = None
+
     overall_start = time.time()
+
+    baseline_scores = []
+    evolved_scores = []
+    scenario_results = []
 
     for attempt in range(1, max(3, iterations // 5) + 1):
         remaining_budget = max(1, iterations - (attempt - 1) * 5)
@@ -249,8 +262,18 @@ def v2_dispatch(
         # Build frontmatter from evolved body for drift comparison
         evolved_full_reassembled = reassemble_skill(best_frontmatter, evolved_body)
         drift_ok, drift_msg = config_drift.check(best_frontmatter, best_frontmatter)
+        drift_ok_final = drift_ok  # track: last attempt's result
         if not drift_ok:
             console.print(f"[red]✗ Config drift: {drift_msg}[/red] — rejecting")
+            continue
+
+        # ── 5c2. Purpose Preservation Check (hard gate) ─────────────────
+        purpose_ok, purpose_msg = purpose_check.check(evolved_body, baseline_body)
+        purpose_ok_final = purpose_ok  # track: last attempt's result
+        if not purpose_ok:
+            console.print(f"[red]✗ Purpose lost: {purpose_msg[:120]}[/red] — rejecting evolved variant")
+            # Purpose-preservation failures are structural (not score-based);
+            # skip backtrack checkpointing since avg_baseline may not yet exist.
             continue
 
         # ── 5d. Evaluate on holdout ─────────────────────────────────────
@@ -295,6 +318,7 @@ def v2_dispatch(
 
         # ── 5e. Skill Regression Check ──────────────────────────────────
         reg_ok, reg_msg = regression.check_score(avg_evolved, avg_baseline)
+        reg_ok_final = reg_ok  # track: last attempt's result
         if not reg_ok:
             console.print(f"[red]✗ Regression: {reg_msg}[/red] — rejecting evolved variant")
             # Checkpoint even for rejections (Backtrack needs the history)
@@ -308,6 +332,7 @@ def v2_dispatch(
 
         # ── 5f. Scope Creep Check ───────────────────────────────────────
         scope_status, scope_msg = scope.check(evolved_body, best_body)
+        scope_status_final = scope_status  # track: last attempt's result
         if scope_status == "major_drift":
             console.print(f"[yellow]⚠ Scope creep: {scope_msg}[/yellow]")
             # Major drift is a warning, not a blocker — flag in report
@@ -321,6 +346,7 @@ def v2_dispatch(
             robustness_passed=True,  # Regression check already passed
         )
 
+        pareto_source_final = pareto_result.source  # track: last attempt's result
         if pareto_result.source == "evolved":
             best_body = evolved_body
             best_score = avg_evolved
@@ -411,6 +437,16 @@ def v2_dispatch(
     (output_dir / "baseline_skill.md").write_text(baseline_full)
 
     report_path = output_dir / "report.json"
+    # ── Build v2 constraint summary (from last completed attempt's outcomes) ──
+    v2_constraints = {
+        "config_drift_passed": drift_ok_final,
+        "purpose_preservation_passed": purpose_ok_final,  # None if PurposePreservationChecker not yet integrated
+        "scope_status": scope_status_final,
+        "regression_passed": reg_ok_final,
+        "pareto_source": pareto_source_final,
+        "router_action": router_decision.action,
+    }
+
     report_dict = {
         "skill_name": report.skill_name,
         "iterations_executed": report.n_iterations_executed,
@@ -428,8 +464,32 @@ def v2_dispatch(
         "elapsed_seconds": round(overall_elapsed, 1),
         "attempt_metrics": run_metrics,
         "posthoc": posthoc.to_dict(posthoc_report) if posthoc_report else None,
+        "v2_constraints": v2_constraints,
     }
     (output_dir / "report.json").write_text(json.dumps(report_dict, indent=2))
+
+    # ── Write metrics.json (v1 schema + v2_constraints) ─────────────────
+    metrics = {
+        "skill_name": skill_name,
+        "timestamp": timestamp,
+        "iterations": iterations,
+        "optimizer_model": optimizer_model,
+        "optimizer_type": optimizer_type if "optimizer_type" in dir() else None,
+        "eval_model": eval_model,
+        "eval_source": eval_source,
+        "baseline_score": baseline_scores[0] if baseline_scores else 0.0,
+        "evolved_score": best_score,
+        "improvement": total_improvement,
+        "baseline_size": len(baseline_body),
+        "evolved_size": len(best_body),
+        "train_examples": len(dataset.train) if "dataset" in dir() else 0,
+        "val_examples": len(dataset.val) if "dataset" in dir() else 0,
+        "holdout_examples": len(dataset.holdout) if "dataset" in dir() else 0,
+        "elapsed_seconds": round(overall_elapsed, 1),
+        "constraints_passed": all_pass,
+        "v2_constraints": v2_constraints,
+    }
+    (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
 
     console.print(f"\n  Output saved to {output_dir}/")
     console.print()

@@ -1,0 +1,27 @@
+{
+  "skill_name": "companion-roundtable",
+  "timestamp": "20260502_164944",
+  "iterations": 3,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "optimizer_type": "GEPA",
+  "eval_model": "minimax/minimax-m2.7",
+  "eval_source": "synthetic",
+  "baseline_score": 0.6625,
+  "evolved_score": 0.6853405049786628,
+  "improvement": 0.0,
+  "baseline_size": 20911,
+  "evolved_size": 20911,
+  "train_examples": 10,
+  "val_examples": 5,
+  "holdout_examples": 5,
+  "elapsed_seconds": 509.8,
+  "constraints_passed": true,
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": true,
+    "scope_status": "match",
+    "regression_passed": true,
+    "pareto_source": "baseline",
+    "router_action": "extend"
+  }
+}

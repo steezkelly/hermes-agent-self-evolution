@@ -1,0 +1,55 @@
+{
+  "seed": "Convert natural language task descriptions into structured Linear issues with title, description, priority, team, and assignee fields via the Linear GraphQL API",
+  "iterations_per_section": 3,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "eval_model": "minimax/minimax-m2.7",
+  "coherence_passed": true,
+  "coherence_issues": "none",
+  "section_metrics": {
+    "overview": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "steps": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "when-to-use": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "examples": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "pitfalls": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "troubleshooting": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "constraints": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "verification": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "variants": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    },
+    "related-skills": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.0
+    }
+  },
+  "total_elapsed_seconds": 346.9566557407379,
+  "skill_name": "convert-natural-language-task-descriptio",
+  "skill_description": "Convert natural language task descriptions into structured Linear issues with title, description, priority, team, and assignee fields via the Linear GraphQL API",
+  "total_chars": 22807,
+  "timestamp": "20260501_062813"
+}

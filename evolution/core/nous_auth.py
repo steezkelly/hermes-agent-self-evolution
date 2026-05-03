@@ -211,9 +211,10 @@ def _get_lm_kwargs(model: str) -> Tuple[dict, str]:
 
     # Stripping provider prefix for litellm routing
     # MiniMax through MiniMax API: keep bare model (litellm expects bare)
-    # Everything else through Nous Portal: keep full provider/model format
+    # MiniMax through Nous Portal: keep full provider/model format (Nous needs it)
+    # All other provider/model formats through Nous Portal: keep as-is
     bare_model = model
-    if "/" in model and model_lower.startswith("minimax/"):
+    if "/" in model and model_lower.startswith("minimax/") and "nousresearch.com" not in base_url:
         bare_model = model.split("/", 1)[-1]
     # For other provider/model formats, litellm handles them as-is
     # through the Nous unified gateway

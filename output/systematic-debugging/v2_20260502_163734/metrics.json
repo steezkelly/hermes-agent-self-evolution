@@ -1,0 +1,27 @@
+{
+  "skill_name": "systematic-debugging",
+  "timestamp": "20260502_163734",
+  "iterations": 3,
+  "optimizer_model": "minimax/minimax-m2.7",
+  "optimizer_type": "GEPA",
+  "eval_model": "minimax/minimax-m2.7",
+  "eval_source": "synthetic",
+  "baseline_score": 0.6499999999999999,
+  "evolved_score": 0.6443939393939393,
+  "improvement": -0.005936423054070161,
+  "baseline_size": 10020,
+  "evolved_size": 10020,
+  "train_examples": 10,
+  "val_examples": 5,
+  "holdout_examples": 5,
+  "elapsed_seconds": 261.4,
+  "constraints_passed": true,
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": true,
+    "scope_status": "match",
+    "regression_passed": true,
+    "pareto_source": "baseline",
+    "router_action": "extend"
+  }
+}

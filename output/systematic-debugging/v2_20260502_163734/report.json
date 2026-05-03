@@ -1,0 +1,39 @@
+{
+  "skill_name": "systematic-debugging",
+  "iterations_executed": 3,
+  "improvement": -0.005936423054070161,
+  "recommendation": "reject",
+  "details": "v2.1 pipeline: 3 attempts, best score 0.644 (baseline: 0.650)",
+  "router": {
+    "action": "extend",
+    "failure_pattern": "noise",
+    "confidence": 0.3,
+    "rationale": "Budget nearly exhausted, no clear pattern \u2014 extending by default"
+  },
+  "best_score": 0.6443939393939393,
+  "baseline_score": 0.6499999999999999,
+  "elapsed_seconds": 261.4,
+  "attempt_metrics": [
+    {
+      "attempt": 2,
+      "avg_baseline": 0.6443939393939393,
+      "avg_evolved": 0.6384575163398691,
+      "improvement": -0.005936423054070161
+    },
+    {
+      "attempt": 3,
+      "avg_baseline": 0.6443939393939393,
+      "avg_evolved": 0.6384575163398691,
+      "improvement": -0.005936423054070161
+    }
+  ],
+  "posthoc": null,
+  "v2_constraints": {
+    "config_drift_passed": true,
+    "purpose_preservation_passed": true,
+    "scope_status": "match",
+    "regression_passed": true,
+    "pareto_source": "baseline",
+    "router_action": "extend"
+  }
+}

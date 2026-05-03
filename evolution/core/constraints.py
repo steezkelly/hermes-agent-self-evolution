@@ -135,11 +135,28 @@ class ConstraintValidator:
         else:
             max_growth = 0.2   # +20% — large skills are saturated
 
+        # Shrinkage limit: excessive deletion is a common failure mode where
+        # GEPA replaces detailed content with vague summaries. The baseline_size
+        # thresholds mirror growth (small skills can be refactored more aggressively).
+        if baseline_size < 5_000:
+            min_growth = -0.5   # -50% for small skills
+        elif baseline_size < 20_000:
+            min_growth = -0.3   # -30% for medium skills
+        else:
+            min_growth = -0.2   # -20% for large skills
+
+        if growth < min_growth:
+            return ConstraintResult(
+                passed=False,
+                constraint_name="growth_limit",
+                message=f"Shrinkage too large: {growth:+.1%} (floor {min_growth:+.1%})",
+            )
+
         if growth <= max_growth:
             return ConstraintResult(
                 passed=True,
                 constraint_name="growth_limit",
-                message=f"Growth OK: {growth:+.1%} (max {max_growth:+.1%})",
+                message=f"Growth OK: {growth:+.1%} (max {max_growth:+.1%}, floor {min_growth:+.1%})",
             )
         else:
             return ConstraintResult(
