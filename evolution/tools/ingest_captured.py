@@ -159,11 +159,16 @@ def _check_overlaps(body: str) -> List[Dict[str, Any]]:
 # Deployment
 # ---------------------------------------------------------------------------
 
-def deploy_candidate(candidate_path: Path) -> tuple[bool, str]:
+def deploy_candidate(candidate_path: Path, *, enrich: bool = False) -> tuple[bool, str]:
     """Deploy a validated candidate as a real skill.
 
     Creates a SKILL.md in ~/.hermes/skills/<name>/ and marks the
     candidate as 'deployed' in the captured store.
+
+    Args:
+        candidate_path: Path to the captured candidate JSON.
+        enrich: If True, generates synthetic eval examples from the
+            deployed SKILL.md and merges them into the dataset.
     """
     try:
         data = json.loads(candidate_path.read_text())
@@ -212,6 +217,29 @@ def deploy_candidate(candidate_path: Path) -> tuple[bool, str]:
     from evolution.core.dataset_builder import EvalDataset
     output_dir = Path("datasets") / "skills" / name
     save_as_sessiondb_example(candidate_path, output_dir)
+
+    # P1.1 — optional synthetic enrichment
+    if enrich:
+        try:
+            from evolution.core.dataset_builder import SyntheticDatasetBuilder
+            from evolution.core.config import EvolutionConfig
+
+            config = EvolutionConfig()
+            synth = SyntheticDatasetBuilder(config)
+            synthetic_ds = synth.generate(
+                artifact_text=skill_md,
+                artifact_type="skill",
+                num_cases=max(3, config.eval_dataset_size // 2),
+            )
+            existing_ds = EvalDataset.load(output_dir) if output_dir.exists() else EvalDataset()
+            counts = existing_ds.merge(synthetic_ds)
+            existing_ds.save_atomic(output_dir)
+            return True, (
+                f"Deployed + enriched ({sum(counts.values())} synthetic) "
+                f"to {target_dir / 'SKILL.md'}"
+            )
+        except Exception as e:
+            return True, f"Deployed to {target_dir / 'SKILL.md'} (enrich failed: {e})"
 
     return True, f"Deployed to {target_dir / 'SKILL.md'}"
 
@@ -372,7 +400,7 @@ def save_as_sessiondb_example(candidate_path: Path, output_dir: Path) -> None:
 # Evolve integration
 # ---------------------------------------------------------------------------
 
-def evolve_and_deploy(candidate_path: Path, iterations: int = 5) -> tuple[bool, str]:
+def evolve_and_deploy(candidate_path: Path, iterations: int = 5, *, enrich: bool = False) -> tuple[bool, str]:
     """Validate, run v2 evolution pipeline, then deploy if improvement.
 
     Returns (success, message).
@@ -486,7 +514,7 @@ def run_cli(args: List[str]) -> int:
 Usage:
     python -m evolution.tools.ingest_captured list [status]     List candidates
     python -m evolution.tools.ingest_captured validate <file>   Validate a candidate
-    python -m evolution.tools.ingest_captured deploy <file>     Deploy a validated candidate
+    python -m evolution.tools.ingest_captured deploy <file> [--enrich]   Deploy (opt. enrich)
     python -m evolution.tools.ingest_captured auto              Validate + deploy all pending
     python -m evolution.tools.ingest_captured evolve <file>     Evolve then deploy
     python -m evolution.tools.ingest_captured stats             Capture statistics
@@ -554,7 +582,8 @@ Usage:
                 return 1
             target = Path(matches[0]["file"])
 
-        success, msg = deploy_candidate(target)
+        enrich = "--enrich" in args
+        success, msg = deploy_candidate(target, enrich=enrich)
         if success:
             console.print(f"[green]✓ {msg}[/green]")
         else:
@@ -585,7 +614,8 @@ Usage:
             console.print(f"  [green]✓ Valid[/green]")
 
             # Deploy
-            success, msg = deploy_candidate(path)
+            enrich = "--enrich" in args
+            success, msg = deploy_candidate(path, enrich=enrich)
             if success:
                 console.print(f"  [green]✓ {msg}[/green]")
                 deployed += 1

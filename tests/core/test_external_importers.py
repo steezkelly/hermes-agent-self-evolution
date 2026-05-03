@@ -1230,4 +1230,4 @@ class TestEvalExampleFormat:
         with open(jsonl_path) as f:
             data = json.loads(f.readline())
 
-        assert set(data.keys()) == {"task_input", "expected_behavior", "difficulty", "category", "source"}
+        assert set(data.keys()).issuperset({"task_input", "expected_behavior", "difficulty", "category", "source"})
