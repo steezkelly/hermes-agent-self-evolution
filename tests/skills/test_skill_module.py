@@ -2,7 +2,13 @@
 
 import pytest
 from pathlib import Path
-from evolution.skills.skill_module import load_skill, reassemble_skill
+from evolution.skills.skill_module import (
+    _SKILL_BODY_SENTINEL_,
+    _SKILL_INSTRUCTION_HEADER,
+    SkillModule,
+    load_skill,
+    reassemble_skill,
+)
 
 
 SAMPLE_SKILL = """---
@@ -90,3 +96,24 @@ class TestReassembleSkill:
 
         assert "EVOLVED" in result
         assert "New and improved" in result
+
+
+class TestSkillModuleOptimizationSurface:
+    def test_skill_body_is_embedded_in_predictor_instructions(self):
+        body = "# My Skill\nUse the improved procedure."
+        module = SkillModule(body)
+
+        instructions = module.predictor.predict.signature.instructions
+
+        assert instructions.startswith(_SKILL_INSTRUCTION_HEADER)
+        assert body in instructions
+        assert _SKILL_BODY_SENTINEL_ in instructions
+        assert module.skill_body == body
+
+    def test_task_signature_no_longer_treats_skill_as_input_field(self):
+        module = SkillModule("# My Skill\nDo the thing.")
+
+        input_fields = module.predictor.predict.signature.input_fields
+
+        assert "task_input" in input_fields
+        assert "skill_instructions" not in input_fields

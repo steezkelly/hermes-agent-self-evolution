@@ -28,9 +28,54 @@ from evolution.skills.skill_module import (
     load_skill,
     find_skill,
     reassemble_skill,
+    _SKILL_BODY_SENTINEL_,
+    _SKILL_INSTRUCTION_HEADER,
 )
 
 console = Console()
+
+
+def _candidate_instruction_texts(module) -> list[str]:
+    """Return instruction/docstring slots that DSPy optimizers may mutate."""
+    candidates = []
+    predictor = getattr(module, "predictor", None)
+    nested_predict = getattr(predictor, "predict", None)
+
+    for obj in (nested_predict, predictor):
+        if obj is None:
+            continue
+        for attr in ("__doc__", "doc"):
+            value = getattr(obj, attr, None)
+            if value:
+                candidates.append(value)
+        signature = getattr(obj, "signature", None)
+        instructions = getattr(signature, "instructions", None)
+        if instructions:
+            candidates.append(instructions)
+
+    return candidates
+
+
+def _extract_evolved_skill_body(module, original_skill_body: str) -> str:
+    """Extract the evolved skill body from a GEPA-optimized SkillModule.
+
+    GEPA mutates predictor instruction text, not SkillModule.skill_body.
+    Reading skill_body after optimization can therefore report an improved
+    score while writing the original body back to disk. Extract the body from
+    the predictor's mutated instructions/docstring, bounded by the sentinel
+    inserted by SkillModule.
+    """
+    for instruction_text in _candidate_instruction_texts(module):
+        if not instruction_text.startswith(_SKILL_INSTRUCTION_HEADER):
+            continue
+        rest = instruction_text[len(_SKILL_INSTRUCTION_HEADER):]
+        if _SKILL_BODY_SENTINEL_ not in rest:
+            continue
+        evolved_body = rest.split(_SKILL_BODY_SENTINEL_, 1)[0].strip()
+        if evolved_body:
+            return evolved_body
+
+    return original_skill_body
 
 
 def evolve(
@@ -179,9 +224,13 @@ def evolve(
     elapsed = time.time() - start_time
     console.print(f"\n  Optimization completed in {elapsed:.1f}s")
 
-    # ── 6. Extract evolved skill text ───────────────────────────────────
-    # The optimized module's instructions contain the evolved skill text
-    evolved_body = optimized_module.skill_text
+    # ── 6. Extract evolved skill body ───────────────────────────────────
+    evolved_body = _extract_evolved_skill_body(optimized_module, skill["body"])
+    if not evolved_body.strip():
+        console.print("[yellow]  ⚠ Could not extract evolved body — using baseline[/yellow]")
+        evolved_body = skill["body"]
+    elif evolved_body == skill["body"]:
+        console.print("[dim]  (baseline body retained — optimizer found no improved variant)[/dim]")
     evolved_full = reassemble_skill(skill["frontmatter"], evolved_body)
 
     # ── 7. Validate evolved skill ───────────────────────────────────────
