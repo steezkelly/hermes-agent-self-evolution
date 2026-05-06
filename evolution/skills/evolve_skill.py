@@ -138,6 +138,7 @@ def evolve(
     report_dir: str = "reports/runs",
     run_benchmark_gate: bool = False,
     prepare_pr: bool = False,
+    override_breaker: bool = False,
 ):
     """Main evolution function — orchestrates the full optimization loop."""
 
@@ -298,6 +299,26 @@ def evolve(
         console.print("[dim]  (baseline body retained — GEPA found no improved variant)[/dim]")
 
     evolved_full = reassemble_skill(skill["frontmatter"], evolved_body)
+
+    # ── 6b. ROI Circuit Breaker: check BEFORE expensive holdout evaluation ─
+    # (Phase 3) If 3 consecutive prior runs with improvement < 0.005, warn user
+    from evolution.core.observatory.roi_circuit import ROICircuitBreaker
+    breaker = ROICircuitBreaker()
+    is_open, breaker_msg = breaker.check(skill_name)
+    if is_open and not override_breaker:
+        console.print(f"\n[bold red]⚠ ROI CIRCUIT BREAKER OPEN[/bold red] for {skill_name}")
+        console.print(f"  {breaker_msg}")
+        console.print("  Use --override-breaker to run anyway.")
+        output_path = Path("output") / skill_name / "evolved_FAILED.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(evolved_full)
+        console.print(f"  Saved to {output_path} for inspection.")
+        # Skip the expensive holdout evaluation and return early
+        return
+    elif is_open and override_breaker:
+        console.print(f"\n[yellow]⚠ ROI CIRCUIT BREAKER OPEN — overridden[/yellow]")
+        console.print(f"  {breaker_msg}")
+        breaker.override(skill_name, "CLI --override-breaker flag")
 
     # ── 7. Validate evolved skill ───────────────────────────────────────
     console.print(f"\n[bold]Validating evolved skill[/bold]")
@@ -517,6 +538,22 @@ def evolve(
         console.print(f"\n[yellow]⚠ Evolution did not improve skill (change: {improvement:+.3f})[/yellow]")
         console.print("  Try: more iterations, better eval dataset, or different optimizer model")
 
+    # ── 12. Record ROI for the circuit breaker ──────────────────────────
+    # (Phase 3) Persist (improvement, cost) so the breaker can halt repeated zero-ROI runs
+    from evolution.core.observatory.roi_circuit import ROICircuitBreaker
+    breaker = ROICircuitBreaker()
+    total_cost = breaker.compute_run_cost(skill_name)
+    breaker.record_run(
+        skill_name=skill_name,
+        improvement=round(improvement, 6),
+        baseline_score=round(avg_baseline, 6),
+        evolved_score=round(avg_evolved, 6),
+        iterations=iterations,
+        total_cost=round(total_cost, 6),
+        notes=f"optimizer={optimizer_model} eval={eval_model}",
+    )
+    console.print(f"  ROI recorded: improvement={improvement:+.4f} cost=${total_cost:.4f}")
+
 
 @click.command()
 @click.option("--skill", required=True, help="Name of the skill to evolve")
@@ -535,9 +572,60 @@ def evolve(
 @click.option("--run-benchmark-gate", is_flag=True, help="Evaluate the run report with benchmark gates")
 @click.option("--prepare-pr", is_flag=True, help="Write a local PR body artifact from the run report")
 @click.option("--v2", is_flag=True, help="Use GEPA v2.1 pipeline (Router + robustness gates + backtrack)")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv, write_report, report_dir, run_benchmark_gate, prepare_pr, v2):
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv, write_report, report_dir, run_benchmark_gate, prepare_pr, v2, mode, override_breaker):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
-    if v2:
+    if mode == "content":
+        from evolution.skills.evolve_content import evolve_content
+        evolve_content(
+            skill_name=skill,
+            eval_source=eval_source,
+            dataset_path=dataset_path,
+            evaluator_model=eval_model,
+            rewrite_model=eval_model,
+            hermes_repo=hermes_repo,
+            dry_run=dry_run,
+        )
+    elif mode == "both":
+        console.print("[bold cyan]Running BOTH modes: GEPA (framing) then ContentEvolver[/bold cyan]")
+        if v2:
+            from evolution.core.gepa_v2_dispatch import v2_dispatch
+            v2_dispatch(
+                skill_name=skill,
+                iterations=iterations,
+                eval_source=eval_source,
+                dataset_path=dataset_path,
+                optimizer_model=optimizer_model,
+                eval_model=eval_model,
+                hermes_repo=hermes_repo,
+                run_tests=run_tests,
+                dry_run=dry_run,
+                stats_csv=stats_csv,
+            )
+        else:
+            evolve(
+                skill_name=skill,
+                iterations=iterations,
+                eval_source=eval_source,
+                dataset_path=dataset_path,
+                optimizer_model=optimizer_model,
+                eval_model=eval_model,
+                hermes_repo=hermes_repo,
+                run_tests=run_tests,
+                dry_run=dry_run,
+                stats_csv=stats_csv,
+                override_breaker=override_breaker,
+            )
+        from evolution.skills.evolve_content import evolve_content
+        evolve_content(
+            skill_name=skill,
+            eval_source=eval_source,
+            dataset_path=dataset_path,
+            evaluator_model=eval_model,
+            rewrite_model=eval_model,
+            hermes_repo=hermes_repo,
+            dry_run=dry_run,
+        )
+    elif v2:
         from evolution.core.gepa_v2_dispatch import v2_dispatch
         v2_dispatch(
             skill_name=skill,
@@ -567,6 +655,7 @@ def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_mod
             report_dir=report_dir,
             run_benchmark_gate=run_benchmark_gate,
             prepare_pr=prepare_pr,
+            override_breaker=override_breaker,
         )
 
 
