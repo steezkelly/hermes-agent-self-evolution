@@ -1,5 +1,7 @@
 # 🧬 Hermes Agent Self-Evolution
 
+> Fork direction: this repository is evolving into an agent evolution lab — a workbench for improving autonomous-agent skills, tools, prompts, datasets, and evaluation loops from real usage evidence. See [Project Direction](docs/project-direction.md).
+
 **Evolutionary self-improvement for [Hermes Agent](https://github.com/NousResearch/hermes-agent).**
 
 Hermes Agent Self-Evolution uses DSPy + GEPA (Genetic-Pareto Prompt Evolution) to automatically evolve and optimize Hermes Agent's skills, tool descriptions, system prompts, and code — producing measurably better versions through reflective evolutionary search.
