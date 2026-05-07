@@ -1,12 +1,19 @@
-# 🧬 Hermes Agent Self-Evolution
+# 🧬 Agent Evolution Lab
 
-> Fork direction: this repository is evolving into an agent evolution lab — a workbench for improving autonomous-agent skills, tools, prompts, datasets, and evaluation loops from real usage evidence. See [Project Direction](docs/project-direction.md).
+> Formerly a fork of `NousResearch/hermes-agent-self-evolution`. This repository is now being shaped into an agent evolution lab: a workbench for improving autonomous-agent skills, tools, prompts, datasets, and evaluation loops from real usage evidence.
 
-**Evolutionary self-improvement for [Hermes Agent](https://github.com/NousResearch/hermes-agent).**
+**Working thesis:** agents should not be static prompt bundles. They should improve from traces, tests, review comments, bug reports, human corrections, and deployment evidence.
 
-Hermes Agent Self-Evolution uses DSPy + GEPA (Genetic-Pareto Prompt Evolution) to automatically evolve and optimize Hermes Agent's skills, tool descriptions, system prompts, and code — producing measurably better versions through reflective evolutionary search.
+This project uses DSPy + GEPA (Genetic-Pareto Prompt Evolution), constraint gates, session-derived datasets, and regression tests to evolve Hermes Agent artifacts while avoiding fake progress such as ghost improvements, type drift, and metric-only wins.
 
-**No GPU training required.** Everything operates via API calls — mutating text, evaluating results, and selecting the best variants. ~$2-10 per optimization run.
+**No GPU training required.** Everything operates through API/local model calls — mutating text, evaluating results, and selecting variants.
+
+## Direction docs
+
+- [Philosophy](docs/philosophy.md) — the evidence-led agent-improvement thesis
+- [Project Direction](docs/project-direction.md) — naming, scope, and fork posture
+- [Public Breadcrumb Policy](docs/public-breadcrumb-policy.md) — when/how to tell upstream users about fork fixes
+- [Migration Plan](docs/plans/agent-evolution-lab-migration.md) — staged path from fork identity to Agent Evolution Lab
 
 ## How It Works
 
@@ -30,8 +37,8 @@ GEPA reads execution traces to understand *why* things fail (not just that they 
 ## Quick Start
 
 ```bash
-# Install
-git clone https://github.com/NousResearch/hermes-agent-self-evolution.git
+# Install this fork/lab branch
+git clone https://github.com/steezkelly/hermes-agent-self-evolution.git
 cd hermes-agent-self-evolution
 pip install -e ".[dev]"
 
@@ -79,7 +86,13 @@ Every evolved variant must pass:
 
 ## Full Plan
 
-See [PLAN.md](PLAN.md) for the complete architecture, evaluation data strategy, constraints, benchmarks integration, and phased timeline.
+See [PLAN.md](PLAN.md) for the original architecture, evaluation data strategy, constraints, benchmarks integration, and phased timeline.
+
+For the fork's current identity and migration path, see:
+
+- [Philosophy](docs/philosophy.md)
+- [Project Direction](docs/project-direction.md)
+- [Migration Plan](docs/plans/agent-evolution-lab-migration.md)
 
 ## License
 

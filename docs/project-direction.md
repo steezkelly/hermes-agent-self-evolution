@@ -38,21 +38,15 @@ Latest verified baseline at the time this direction note was created:
 
 It is useful and allowed to tell others about the fork when the comment is directly relevant to an issue or PR.
 
-Good comments:
-
-- report a tested fix for the exact bug being discussed
-- link to a specific commit, PR, or reproducible workaround
-- include verification commands and results
-- clearly state when behavior is fork-local, not upstream-supported
-
-Bad comments:
-
-- generic fork promotion
-- repeated comments across loosely related issues
-- presenting experimental fork behavior as official upstream behavior
-- commenting without a concrete fix, reproduction, or useful evidence
-
 Default rule: comment only when the reader of that specific issue would save time from the information.
+
+See [Public Breadcrumb Policy](public-breadcrumb-policy.md) for the full policy and comment template.
+
+## Philosophy
+
+Agent Evolution Lab is not just a prompt optimizer. It is a workbench for building agents that can improve from evidence: usage traces, failures, review comments, tests, metrics, datasets, and human corrections.
+
+See [Agent Evolution Lab Philosophy](philosophy.md) for the full philosophy shift.
 
 ## Rebrand candidates
 
