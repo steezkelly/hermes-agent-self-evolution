@@ -19,25 +19,47 @@ from evolution.core.config import EvolutionConfig
 
 @dataclass
 class EvalExample:
-    """A single evaluation example."""
+    """A single evaluation example.
+
+    Source metadata is optional so older golden/synthetic JSONL files continue
+    to load, but external-session examples can preserve enough context for
+    audit and debugging before promotion into hermes-agent.
+    """
     task_input: str  # What the user asks
     expected_behavior: str  # Rubric — what a good response looks like
     difficulty: str = "medium"  # easy, medium, hard
     category: str = "general"  # Category for stratified eval
-    source: str = "synthetic"  # synthetic, sessiondb, golden
+    source: str = "synthetic"  # synthetic, sessiondb, golden, claude-code, copilot, hermes
+    project: str = ""
+    repo: str = ""
+    session_id: str = ""
+    timestamp: str = ""
+    message_role: str = ""
+    extraction_reason: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             "task_input": self.task_input,
             "expected_behavior": self.expected_behavior,
             "difficulty": self.difficulty,
             "category": self.category,
             "source": self.source,
         }
+        metadata = {
+            "project": self.project,
+            "repo": self.repo,
+            "session_id": self.session_id,
+            "timestamp": self.timestamp,
+            "message_role": self.message_role,
+            "extraction_reason": self.extraction_reason,
+        }
+        data.update({k: v for k, v in metadata.items() if v})
+        return data
 
     @classmethod
     def from_dict(cls, d: dict) -> "EvalExample":
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
+        return cls(**kwargs)
 
 
 @dataclass
