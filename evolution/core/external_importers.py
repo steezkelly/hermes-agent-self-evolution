@@ -26,7 +26,7 @@ import json
 import re
 import random
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import dspy
@@ -723,6 +723,30 @@ def _load_skill_text(skill_name: str, skills_dir: Optional[Path] = None) -> tupl
     raise FileNotFoundError(f"Skill '{skill_name}' not found in {skills_dir}")
 
 
+def describe_source_availability(
+    sources: list[str],
+    importers: dict[str, type],
+) -> dict[str, dict[str, Any]]:
+    """Report per-source availability and candidate counts without LLM calls."""
+    report: dict[str, dict[str, Any]] = {}
+    for source in sources:
+        try:
+            messages = importers[source].extract_messages()
+            candidate_count = len(messages)
+            report[source] = {
+                "available": candidate_count > 0,
+                "candidate_count": candidate_count,
+                "error": None,
+            }
+        except Exception as exc:
+            report[source] = {
+                "available": False,
+                "candidate_count": 0,
+                "error": str(exc),
+            }
+    return report
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────
 
 
@@ -760,9 +784,14 @@ def main(source, skill, output, model, max_examples, dry_run):
             "copilot": CopilotImporter,
             "hermes": HermesSessionImporter,
         }
+        availability = describe_source_availability(sources, importers)
         for src in sources:
-            msgs = importers[src].extract_messages()
-            console.print(f"  {src}: {len(msgs)} messages")
+            info = availability[src]
+            status = "available" if info["available"] else "unavailable"
+            error = f" error={info['error']}" if info["error"] else ""
+            console.print(
+                f"  {src}: {status}, candidates={info['candidate_count']}{error}"
+            )
         console.print("\n[bold green]DRY RUN — no LLM calls made.[/bold green]")
         return
 
