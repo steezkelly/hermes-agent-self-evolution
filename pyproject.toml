@@ -37,6 +37,9 @@ darwinian = [
 Homepage = "https://github.com/NousResearch/hermes-agent-self-evolution"
 Repository = "https://github.com/NousResearch/hermes-agent-self-evolution"
 
+[project.scripts]
+foundry-action-routing-fixture = "evolution.core.action_routing_demo:main"
+
 [tool.setuptools.packages.find]
 include = ["evolution*"]
 

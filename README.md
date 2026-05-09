@@ -14,6 +14,7 @@ This project uses DSPy + GEPA (Genetic-Pareto Prompt Evolution), constraint gate
 - [Project Direction](docs/project-direction.md) — naming, scope, and fork posture
 - [Public Breadcrumb Policy](docs/public-breadcrumb-policy.md) — when/how to tell upstream users about fork fixes
 - [Migration Plan](docs/plans/agent-evolution-lab-migration.md) — staged path from fork identity to Agent Evolution Lab
+- [Action-Router Fixture Demo](docs/action-routing-fixture-demo.md) — deterministic trace-to-eval proof for concise action queues
 
 ## How It Works
 
