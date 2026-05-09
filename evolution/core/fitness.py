@@ -104,36 +104,98 @@ class LLMJudge:
         )
 
 
-def skill_fitness_metric(example: dspy.Example, prediction: dspy.Prediction, trace=None) -> float:
+def skill_fitness_metric(example: dspy.Example, prediction: dspy.Prediction, trace=None) -> dspy.Prediction:
     """DSPy-compatible metric function for skill optimization.
 
-    This is what gets passed to dspy.GEPA(metric=...).
-    Returns a float 0-1 score.
+    Uses the configured DSPy LM as a rubric judge and returns a
+    ``dspy.Prediction(score=..., feedback=...)`` so GEPA can use the
+    feedback for reflective mutation. If judge scoring fails (for example
+    offline use, rate limits, or missing LM configuration), falls back to the
+    old keyword-overlap heuristic with explicit feedback.
     """
-    # The prediction should have an 'output' field with the agent's response
+    # The prediction should have an 'output' field with the agent's response.
     agent_output = getattr(prediction, "output", "") or ""
     expected = getattr(example, "expected_behavior", "") or ""
     task = getattr(example, "task_input", "") or ""
+    skill_text = (
+        getattr(example, "skill_text", "")
+        or getattr(example, "skill_instructions", "")
+        or ""
+    )
 
     if not agent_output.strip():
-        return 0.0
+        return _metric_prediction(0.0, "Agent output was empty, so no task requirements were satisfied.")
 
-    # Quick heuristic scoring (for speed during optimization)
-    # Full LLM-as-judge scoring is expensive — use it selectively
-    score = 0.5  # Base score for non-empty output
+    try:
+        fitness = _score_with_llm_judge(
+            task_input=task,
+            expected_behavior=expected,
+            agent_output=agent_output,
+            skill_text=skill_text,
+        )
+        feedback = fitness.feedback or _default_feedback(fitness)
+        return _metric_prediction(fitness.composite, feedback)
+    except Exception as e:
+        score, feedback = _keyword_overlap_fallback(expected, agent_output)
+        return _metric_prediction(
+            score,
+            f"LLM judge unavailable ({type(e).__name__}: {e}); "
+            f"used keyword-overlap fallback. {feedback}",
+        )
 
-    # Check if key phrases from expected behavior appear
-    expected_lower = expected.lower()
-    output_lower = agent_output.lower()
 
-    # Simple keyword overlap as a fast proxy
-    expected_words = set(expected_lower.split())
-    output_words = set(output_lower.split())
-    if expected_words:
-        overlap = len(expected_words & output_words) / len(expected_words)
-        score = 0.3 + (0.7 * overlap)
+def _score_with_llm_judge(
+    *,
+    task_input: str,
+    expected_behavior: str,
+    agent_output: str,
+    skill_text: str,
+) -> FitnessScore:
+    """Score a metric example with the currently configured DSPy LM."""
+    judge = dspy.ChainOfThought(LLMJudge.JudgeSignature)
+    result = judge(
+        task_input=task_input,
+        expected_behavior=expected_behavior,
+        agent_output=agent_output,
+        skill_text=skill_text,
+    )
 
-    return min(1.0, max(0.0, score))
+    return FitnessScore(
+        correctness=_parse_score(result.correctness),
+        procedure_following=_parse_score(result.procedure_following),
+        conciseness=_parse_score(result.conciseness),
+        feedback=str(result.feedback),
+    )
+
+
+def _keyword_overlap_fallback(expected: str, agent_output: str) -> tuple[float, str]:
+    """Fallback score matching the previous heuristic, plus GEPA feedback."""
+    expected_words = set(expected.lower().split())
+    output_words = set(agent_output.lower().split())
+
+    if not expected_words:
+        return 0.5, "No expected-behavior rubric was provided; assigned neutral score."
+
+    overlap_count = len(expected_words & output_words)
+    overlap = overlap_count / len(expected_words)
+    score = 0.3 + (0.7 * overlap)
+    return min(1.0, max(0.0, score)), (
+        f"Matched {overlap_count}/{len(expected_words)} expected-behavior keywords. "
+        "Improve semantic correctness and procedure following, not just word overlap."
+    )
+
+
+def _metric_prediction(score: float, feedback: str) -> dspy.Prediction:
+    """Create a GEPA feedback metric result while preserving float coercion."""
+    return dspy.Prediction(score=min(1.0, max(0.0, float(score))), feedback=feedback)
+
+
+def _default_feedback(fitness: FitnessScore) -> str:
+    return (
+        f"correctness={fitness.correctness:.2f}, "
+        f"procedure_following={fitness.procedure_following:.2f}, "
+        f"conciseness={fitness.conciseness:.2f}."
+    )
 
 
 def _parse_score(value) -> float:
