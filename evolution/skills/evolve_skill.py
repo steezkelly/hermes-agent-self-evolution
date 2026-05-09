@@ -90,6 +90,29 @@ def _require_non_empty_holdout(dataset: EvalDataset) -> None:
     )
 
 
+def _require_constraints_pass(
+    results: list[ConstraintResult],
+    *,
+    artifact_label: str,
+) -> None:
+    """Fail fast when a required constraint gate has failures."""
+    failures = [result for result in results if not result.passed]
+    if not failures:
+        return
+
+    details = "; ".join(
+        f"{failure.constraint_name}: {failure.message}" for failure in failures
+    )
+    raise click.ClickException(f"{artifact_label} failed constraints: {details}")
+
+
+def _validate_baseline_constraints(
+    skill: dict,
+    validator: ConstraintValidator,
+) -> list[ConstraintResult]:
+    """Validate the complete baseline skill file, including frontmatter."""
+    return validator.validate_all(skill["raw"], "skill")
+
 
 def evolve(
     skill_name: str,
@@ -182,17 +205,13 @@ def evolve(
     # ── 3. Validate constraints on baseline ─────────────────────────────
     console.print(f"\n[bold]Validating baseline constraints[/bold]")
     validator = ConstraintValidator(config)
-    baseline_constraints = validator.validate_all(skill["body"], "skill")
-    all_pass = True
+    baseline_constraints = _validate_baseline_constraints(skill, validator)
     for c in baseline_constraints:
         icon = "✓" if c.passed else "✗"
         color = "green" if c.passed else "red"
         console.print(f"  [{color}]{icon} {c.constraint_name}[/{color}]: {c.message}")
-        if not c.passed:
-            all_pass = False
 
-    if not all_pass:
-        console.print("[yellow]⚠ Baseline skill has constraint violations — proceeding anyway[/yellow]")
+    _require_constraints_pass(baseline_constraints, artifact_label="Baseline skill")
 
     # ── 4. Set up DSPy + GEPA optimizer ─────────────────────────────────
     console.print(f"\n[bold]Configuring optimizer[/bold]")
