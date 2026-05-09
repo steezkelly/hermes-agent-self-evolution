@@ -473,70 +473,123 @@ def skill_fitness_metric(
     trace=None,
     pred_name=None,
     pred_trace=None,
-) -> float | dict:
-    """DSPy-compatible metric function for skill optimization.
+) -> dspy.Prediction | dict:
+    """DSPy-compatible metric for skill optimization.
 
-    Accepts 5 args for GEPA compatibility: (gold, pred, trace, pred_name, pred_trace).
-    When pred_name is provided (GEPA requesting predictor-level feedback), returns
-    a dict {'score': float, 'feedback': str} with diagnostic feedback text.
-    When pred_name is None (normal evaluation), returns a bare float.
-
-    The heuristic: if prediction.output looks like a skill body (contains
-    markdown headings and is >1500 chars), we invoke the LLM first. Otherwise
-    we score the output directly.
+    Accepts the 5-argument GEPA form. For ordinary evaluation it returns a
+    dspy.Prediction(score=..., feedback=...) so GEPA can consume reflective
+    feedback. When GEPA asks for predictor-level feedback via pred_name, return
+    the dict shape expected by DSPy.
     """
-    # The prediction should have an 'output' field with the agent's response
     raw_output = getattr(prediction, "output", "") or ""
     expected = getattr(example, "expected_behavior", "") or ""
     task = getattr(example, "task_input", "") or ""
+    skill_text = (
+        getattr(example, "skill_text", "")
+        or getattr(example, "skill_instructions", "")
+        or ""
+    )
 
     if not raw_output.strip():
-        return 0.0
+        result = _metric_prediction(0.0, "Agent output was empty, so no task requirements were satisfied.")
+        return {"score": result.score, "feedback": result.feedback} if pred_name is not None else result
 
-    # Decide whether prediction is a raw skill body or an actual response.
-    # Skill bodies from MultiComponentSkillModule are ~3K-25K chars and contain ## headings.
     is_skill_body = len(raw_output) > 1500 and raw_output.count("## ") >= 2
-
     if is_skill_body and task.strip():
-        # Invoke the skill as an agent: body = instructions, task = input
         agent_output = _invoke_skill_as_agent(raw_output, task)
     else:
-        # Already a generated response (or no task to run against)
         agent_output = raw_output
 
     if not agent_output.strip():
-        return 0.0
+        result = _metric_prediction(0.0, "Agent output was empty, so no task requirements were satisfied.")
+        return {"score": result.score, "feedback": result.feedback} if pred_name is not None else result
 
-    # Compute score
-    if _embed_scorer is not None and _embed_scorer._fitted:
-        score = _embed_scorer.score(agent_output, expected)
-    elif _global_scorer is not None and _global_scorer._fitted:
-        score = _global_scorer.score(agent_output, expected)
-    else:
-        score = 0.5
-        expected_lower = expected.lower()
-        output_lower = agent_output.lower()
-        expected_words = set(expected_lower.split())
-        output_words = set(output_lower.split())
-        if expected_words:
-            overlap = len(expected_words & output_words) / len(expected_words)
-            score = 0.3 + (0.7 * overlap)
+    try:
+        fitness = _score_with_llm_judge(
+            task_input=task,
+            expected_behavior=expected,
+            agent_output=agent_output,
+            skill_text=skill_text,
+        )
+        feedback = fitness.feedback or _default_feedback(fitness)
+        result = _metric_prediction(fitness.composite, feedback)
+    except Exception as e:
+        score, fallback_feedback = _fallback_similarity_score(expected, agent_output)
+        result = _metric_prediction(
+            score,
+            f"LLM judge unavailable ({type(e).__name__}: {e}); "
+            f"used keyword-overlap fallback/local fallback. {fallback_feedback}",
+        )
 
-    score = min(1.0, max(0.0, score))
-
-    # When GEPA asks for predictor-level feedback (pred_name is set),
-    # return dict with diagnostic feedback text for the reflection LM.
     if pred_name is not None:
-        feedback = _generate_feedback(
+        feedback = result.feedback or _generate_feedback(
             agent_output=agent_output,
             expected=expected,
             task=task,
             pred_name=pred_name,
             raw_output=raw_output,
         )
-        return {"score": score, "feedback": feedback}
+        return {"score": result.score, "feedback": feedback}
 
-    return score
+    return result
+
+
+def _score_with_llm_judge(
+    *,
+    task_input: str,
+    expected_behavior: str,
+    agent_output: str,
+    skill_text: str,
+) -> FitnessScore:
+    """Score a metric example with the currently configured DSPy LM."""
+    judge = dspy.ChainOfThought(LLMJudge.JudgeSignature)
+    result = judge(
+        task_input=task_input,
+        expected_behavior=expected_behavior,
+        agent_output=agent_output,
+        skill_text=skill_text,
+    )
+    return FitnessScore(
+        correctness=_parse_score(result.correctness),
+        procedure_following=_parse_score(result.procedure_following),
+        conciseness=_parse_score(result.conciseness),
+        feedback=str(result.feedback),
+    )
+
+
+def _fallback_similarity_score(expected: str, agent_output: str) -> tuple[float, str]:
+    """Local fallback using embedding/TF-IDF scorers when fitted, else keyword overlap."""
+    if _embed_scorer is not None and _embed_scorer._fitted:
+        score = _embed_scorer.score(agent_output, expected)
+        return min(1.0, max(0.0, score)), "Sentence-embedding fallback score."
+    if _global_scorer is not None and _global_scorer._fitted:
+        score = _global_scorer.score(agent_output, expected)
+        return min(1.0, max(0.0, score)), "TF-IDF fallback score."
+
+    expected_words = set(expected.lower().split())
+    output_words = set(agent_output.lower().split())
+    if not expected_words:
+        return 0.5, "No expected-behavior rubric was provided; assigned neutral score."
+    overlap_count = len(expected_words & output_words)
+    overlap = overlap_count / len(expected_words)
+    score = 0.3 + (0.7 * overlap)
+    return min(1.0, max(0.0, score)), (
+        f"Matched {overlap_count}/{len(expected_words)} expected-behavior keywords. "
+        "Improve semantic correctness and procedure following, not just word overlap."
+    )
+
+
+def _metric_prediction(score: float, feedback: str) -> dspy.Prediction:
+    """Create a feedback metric result while preserving float coercion."""
+    return dspy.Prediction(score=min(1.0, max(0.0, float(score))), feedback=feedback)
+
+
+def _default_feedback(fitness: FitnessScore) -> str:
+    return (
+        f"correctness={fitness.correctness:.2f}, "
+        f"procedure_following={fitness.procedure_following:.2f}, "
+        f"conciseness={fitness.conciseness:.2f}"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

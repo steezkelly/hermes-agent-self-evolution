@@ -105,20 +105,28 @@ def _try_parse_json(text: str) -> list:
 
 @dataclass
 class EvalExample:
-    """A single evaluation example."""
+    """A single evaluation example.
+
+    Keeps legacy captured-session metadata (tool_sequence, complexity_score,
+    success_pattern) and newer external-ingestion provenance fields.
+    """
     task_input: str
     expected_behavior: str
     difficulty: str = "medium"
     category: str = "general"
     source: str = "synthetic"
-    # NEW: captured-session metadata (P0.1)
     tool_sequence: list[str] = field(default_factory=list)
     complexity_score: int = 0
     session_id: str = ""
     success_pattern: str = ""
+    project: str = ""
+    repo: str = ""
+    timestamp: str = ""
+    message_role: str = ""
+    extraction_reason: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             "task_input": self.task_input,
             "expected_behavior": self.expected_behavior,
             "difficulty": self.difficulty,
@@ -129,10 +137,20 @@ class EvalExample:
             "session_id": self.session_id,
             "success_pattern": self.success_pattern,
         }
+        metadata = {
+            "project": self.project,
+            "repo": self.repo,
+            "session_id": self.session_id,
+            "timestamp": self.timestamp,
+            "message_role": self.message_role,
+            "extraction_reason": self.extraction_reason,
+        }
+        data.update({k: v for k, v in metadata.items() if v})
+        return data
 
     @classmethod
     def from_dict(cls, d: dict) -> "EvalExample":
-        # Backward compatibility: old JSONL files may lack new fields
+        # Backward compatibility: old JSONL files may lack new fields.
         kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         for field_name, field_obj in cls.__dataclass_fields__.items():
             if field_name not in kwargs:
