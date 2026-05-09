@@ -43,6 +43,10 @@ def evolve(
     hermes_repo: Optional[str] = None,
     run_tests: bool = False,
     dry_run: bool = False,
+    write_report: bool = True,
+    report_dir: str = "reports/runs",
+    run_benchmark_gate: bool = False,
+    prepare_pr: bool = False,
 ):
     """Main evolution function — orchestrates the full optimization loop."""
 
@@ -283,6 +287,45 @@ def evolve(
     }
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
 
+    if write_report:
+        from evolution.core.benchmark_gate import evaluate_report
+        from evolution.core.pr_builder import build_pr_text
+        from evolution.core.run_report import write_run_report
+
+        report_path = write_run_report(
+            target_name=skill_name,
+            target_type="skill",
+            baseline_path=output_dir / "baseline_skill.md",
+            optimized_path=output_dir / "evolved_skill.md",
+            dataset=dataset,
+            optimizer_model=optimizer_model,
+            eval_model=eval_model,
+            optimizer_type=type(optimizer).__name__,
+            constraints=evolved_constraints,
+            baseline_score=avg_baseline,
+            optimized_score=avg_evolved,
+            elapsed_seconds=elapsed,
+            report_dir=Path(report_dir),
+        )
+        console.print(f"  Run report: {report_path}")
+
+        if run_benchmark_gate:
+            gate_result = evaluate_report(report_path)
+            report = json.loads(report_path.read_text())
+            report["benchmark_gate"] = gate_result.to_dict()
+            report_path.write_text(json.dumps(report, indent=2, sort_keys=True))
+            gate_label = "PASS" if gate_result.passed else "FAIL"
+            console.print(f"  Benchmark gate: {gate_label}")
+            if not gate_result.passed:
+                console.print("[red]✗ Benchmark gate failed — not preparing PR[/red]")
+                prepare_pr = False
+
+        if prepare_pr:
+            title, body = build_pr_text(report_path)
+            pr_body_path = output_dir / "PR_BODY.md"
+            pr_body_path.write_text(f"# {title}\n\n{body}\n")
+            console.print(f"  PR body: {pr_body_path}")
+
     console.print(f"\n  Output saved to {output_dir}/")
 
     if improvement > 0:
@@ -304,7 +347,11 @@ def evolve(
 @click.option("--hermes-repo", default=None, help="Path to hermes-agent repo")
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run):
+@click.option("--write-report/--no-write-report", default=True, help="Write a machine-readable run report")
+@click.option("--report-dir", default="reports/runs", help="Directory for run reports")
+@click.option("--run-benchmark-gate", is_flag=True, help="Evaluate the run report with benchmark gates")
+@click.option("--prepare-pr", is_flag=True, help="Write a local PR body artifact from the run report")
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, write_report, report_dir, run_benchmark_gate, prepare_pr):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
     evolve(
         skill_name=skill,
@@ -316,6 +363,10 @@ def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_mod
         hermes_repo=hermes_repo,
         run_tests=run_tests,
         dry_run=dry_run,
+        write_report=write_report,
+        report_dir=report_dir,
+        run_benchmark_gate=run_benchmark_gate,
+        prepare_pr=prepare_pr,
     )
 
 
