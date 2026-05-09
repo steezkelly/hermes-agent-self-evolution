@@ -121,6 +121,8 @@ def evaluate_report(
         if not argv:
             failures.append("benchmark command was empty")
             continue
+        if argv[0] == "python":
+            argv[0] = sys.executable
         try:
             completed = subprocess.run(
                 argv,
@@ -128,6 +130,15 @@ def evaluate_report(
                 text=True,
                 timeout=benchmark_timeout_seconds,
             )
+        except FileNotFoundError as exc:
+            benchmark_results.append({
+                "command": command,
+                "returncode": None,
+                "stdout": "",
+                "stderr": str(exc)[-4000:],
+            })
+            failures.append(f"benchmark command failed to start: {command}: {exc}")
+            continue
         except subprocess.TimeoutExpired as exc:
             benchmark_results.append({
                 "command": command,
