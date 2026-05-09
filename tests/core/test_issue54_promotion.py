@@ -120,7 +120,7 @@ def test_benchmark_gate_optional_benchmark_command_fails_closed(tmp_path):
 
     result = CliRunner().invoke(
         main,
-        ["--report", str(report_path), "--benchmark-command", "python -c 'raise SystemExit(3)'"],
+        ["--report", str(report_path), "--benchmark-command", "python3 -c 'raise SystemExit(3)'"],
     )
 
     assert result.exit_code != 0
@@ -144,7 +144,7 @@ def test_benchmark_gate_benchmark_command_timeout_fails_closed(tmp_path):
         main,
         [
             "--report", str(report_path),
-            "--benchmark-command", "python -c 'import time; time.sleep(5)'",
+            "--benchmark-command", "python3 -c 'import time; time.sleep(5)'",
             "--benchmark-timeout-seconds", "1",
         ],
     )
