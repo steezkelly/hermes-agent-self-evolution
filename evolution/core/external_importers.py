@@ -26,6 +26,7 @@ import json
 import re
 import random
 import concurrent.futures
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -76,6 +77,50 @@ SECRET_PATTERNS = re.compile(
 VALID_DIFFICULTIES = {"easy", "medium", "hard"}
 
 MIN_DATASET_SIZE = 3  # Minimum examples needed to produce a meaningful split
+
+
+@dataclass
+class SourceAvailability:
+    """Dry-run status for an external session source."""
+
+    source: str
+    path: str
+    available: bool
+    reason: str
+    candidate_count: int = 0
+
+
+def _repo_from_project(project: str) -> str:
+    """Best-effort repo name extraction from a project/workspace path."""
+    if not project:
+        return ""
+    return Path(project).name or ""
+
+
+def _message(
+    *,
+    source: str,
+    task_input: str,
+    assistant_response: str = "",
+    project: str = "",
+    repo: str = "",
+    session_id: str = "",
+    timestamp: str = "",
+    message_role: str = "user",
+    extraction_reason: str,
+) -> dict:
+    """Create the canonical message schema used before EvalExample conversion."""
+    return {
+        "source": source,
+        "task_input": task_input,
+        "assistant_response": assistant_response,
+        "project": project or "",
+        "repo": repo or _repo_from_project(project),
+        "session_id": session_id or "",
+        "timestamp": str(timestamp or ""),
+        "message_role": message_role,
+        "extraction_reason": extraction_reason,
+    }
 
 
 def _contains_secret(text: str) -> bool:
@@ -196,13 +241,16 @@ class ClaudeCodeImporter:
                 if _contains_secret(text):
                     continue
 
-                messages.append({
-                    "source": "claude-code",
-                    "task_input": text,
-                    "project": entry.get("project", ""),
-                    "session_id": entry.get("sessionId", ""),
-                    "timestamp": entry.get("timestamp", 0),
-                })
+                project = entry.get("project", "")
+                messages.append(_message(
+                    source="claude-code",
+                    task_input=text,
+                    project=project,
+                    session_id=entry.get("sessionId", ""),
+                    timestamp=entry.get("timestamp", ""),
+                    message_role="user",
+                    extraction_reason="claude_history_user_prompt",
+                ))
 
                 if limit and len(messages) >= limit:
                     break
@@ -298,13 +346,15 @@ def _parse_copilot_events(
                     # Save previous pair before starting new one
                     if current_user_msg and current_assistant_msg:
                         if not _contains_secret(current_user_msg) and not _contains_secret(current_assistant_msg):
-                            pairs.append({
-                                "source": "copilot",
-                                "task_input": current_user_msg,
-                                "assistant_response": current_assistant_msg,
-                                "project": project,
-                                "session_id": session_id,
-                            })
+                            pairs.append(_message(
+                                source="copilot",
+                                task_input=current_user_msg,
+                                assistant_response=current_assistant_msg,
+                                project=project,
+                                session_id=session_id,
+                                message_role="user",
+                                extraction_reason="copilot_user_assistant_pair",
+                            ))
 
                     current_user_msg = data.get("content", "")
                     current_assistant_msg = None
@@ -320,13 +370,15 @@ def _parse_copilot_events(
         # Don't forget the last pair in the file
         if current_user_msg and current_assistant_msg:
             if not _contains_secret(current_user_msg) and not _contains_secret(current_assistant_msg):
-                pairs.append({
-                    "source": "copilot",
-                    "task_input": current_user_msg,
-                    "assistant_response": current_assistant_msg,
-                    "project": project,
-                    "session_id": session_id,
-                })
+                pairs.append(_message(
+                    source="copilot",
+                    task_input=current_user_msg,
+                    assistant_response=current_assistant_msg,
+                    project=project,
+                    session_id=session_id,
+                    message_role="user",
+                    extraction_reason="copilot_user_assistant_pair",
+                ))
 
     except Exception as e:
         console.print(f"[dim]Skipped {session_id}: {e}[/dim]")
@@ -406,12 +458,17 @@ class HermesSessionImporter:
                 if assistant_text and _contains_secret(assistant_text):
                     continue
 
-                messages.append({
-                    "source": "hermes",
-                    "task_input": user_text,
-                    "assistant_response": assistant_text,
-                    "session_id": session_id,
-                })
+                project = data.get("project", "") or data.get("cwd", "")
+                messages.append(_message(
+                    source="hermes",
+                    task_input=user_text,
+                    assistant_response=assistant_text,
+                    project=project,
+                    session_id=session_id,
+                    timestamp=msg.get("timestamp", data.get("timestamp", "")),
+                    message_role="user",
+                    extraction_reason="hermes_user_assistant_pair",
+                ))
 
                 if limit and len(messages) >= limit:
                     return messages
@@ -523,7 +580,16 @@ class RelevanceFilter:
                     )
                     if validated:
                         progress.update(progress_task, advance=1)
-                        return EvalExample(source=msg["source"], **validated)
+                        return EvalExample(
+                            source=msg["source"],
+                            project=msg.get("project", ""),
+                            repo=msg.get("repo", ""),
+                            session_id=msg.get("session_id", ""),
+                            timestamp=msg.get("timestamp", ""),
+                            message_role=msg.get("message_role", "user"),
+                            extraction_reason="llm_relevant",
+                            **validated,
+                        )
 
                 progress.update(progress_task, advance=1)
                 return None
@@ -621,6 +687,34 @@ def _parse_scoring_json(text: str) -> Optional[dict]:
 # ── Orchestration ─────────────────────────────────────────────────────────
 
 
+def _importer_registry() -> dict[str, tuple[str, type, Path]]:
+    return {
+        "claude-code": ("Claude Code", ClaudeCodeImporter, ClaudeCodeImporter.HISTORY_PATH),
+        "copilot": ("Copilot", CopilotImporter, CopilotImporter.SESSION_DIR),
+        "hermes": ("Hermes Agent", HermesSessionImporter, HermesSessionImporter.SESSION_DIR),
+    }
+
+
+def describe_source_availability(sources: list[str]) -> list[SourceAvailability]:
+    """Return explicit dry-run availability and candidate counts per source."""
+    statuses: list[SourceAvailability] = []
+    importers = _importer_registry()
+    for source in sources:
+        if source not in importers:
+            statuses.append(SourceAvailability(source, "", False, "unknown_source", 0))
+            continue
+        _, importer_cls, path = importers[source]
+        if not path.exists():
+            statuses.append(SourceAvailability(source, str(path), False, "missing_path", 0))
+            continue
+        try:
+            candidate_count = len(importer_cls.extract_messages())
+            statuses.append(SourceAvailability(source, str(path), True, "ok", candidate_count))
+        except Exception as exc:
+            statuses.append(SourceAvailability(source, str(path), False, f"error: {exc}", 0))
+    return statuses
+
+
 def build_dataset_from_external(
     skill_name: str,
     skill_text: str,
@@ -647,16 +741,12 @@ def build_dataset_from_external(
     """
     all_messages = []
 
-    importers = {
-        "claude-code": ("Claude Code", ClaudeCodeImporter),
-        "copilot": ("Copilot", CopilotImporter),
-        "hermes": ("Hermes Agent", HermesSessionImporter),
-    }
+    importers = _importer_registry()
 
     for source in sources:
         if source not in importers:
             continue
-        label, importer_cls = importers[source]
+        label, importer_cls, _ = importers[source]
         console.print(f"\n[bold]Importing from {label}...[/bold]")
         msgs = importer_cls.extract_messages()
         console.print(f"  Found {len(msgs)} messages")
@@ -673,6 +763,15 @@ def build_dataset_from_external(
     examples = relevance_filter.filter_and_score(
         all_messages, skill_name, skill_text, max_examples=max_examples,
     )
+
+    deduped_examples = []
+    seen_inputs = set()
+    for ex in examples:
+        if ex.task_input in seen_inputs:
+            continue
+        seen_inputs.add(ex.task_input)
+        deduped_examples.append(ex)
+    examples = deduped_examples
 
     console.print(f"\n[bold green]Found {len(examples)} relevant examples[/bold green]")
 
@@ -773,14 +872,12 @@ def main(source, skill, output, model, max_examples, dry_run):
     sources = [source] if source != "all" else ["claude-code", "copilot", "hermes"]
 
     if dry_run:
-        importers = {
-            "claude-code": ClaudeCodeImporter,
-            "copilot": CopilotImporter,
-            "hermes": HermesSessionImporter,
-        }
-        for src in sources:
-            msgs = importers[src].extract_messages()
-            console.print(f"  {src}: {len(msgs)} messages")
+        for status in describe_source_availability(sources):
+            state = "available" if status.available else "unavailable"
+            click.echo(
+                f"  {status.source}: {state} path={status.path} "
+                f"reason={status.reason} candidates={status.candidate_count}"
+            )
         console.print("\n[bold green]DRY RUN — no LLM calls made.[/bold green]")
         return
 

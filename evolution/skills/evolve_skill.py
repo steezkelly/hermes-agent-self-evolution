@@ -22,7 +22,7 @@ from evolution.core.config import EvolutionConfig, get_hermes_agent_path
 from evolution.core.dataset_builder import SyntheticDatasetBuilder, EvalDataset, GoldenDatasetLoader
 from evolution.core.external_importers import build_dataset_from_external
 from evolution.core.fitness import skill_fitness_metric, fit_global_scorer, fit_embedding_scorer, LLMJudge, FitnessScore
-from evolution.core.constraints import ConstraintValidator
+from evolution.core.constraints import ConstraintValidator, ConstraintResult
 from evolution.core.nous_auth import _get_lm_kwargs
 from evolution.skills.skill_module import (
     load_skill,
@@ -42,10 +42,8 @@ def multi_component_extract(optimized_module, original_body: str, sections) -> s
     """Extract evolved skill body from a GEPA-optimized MultiComponentSkillModule.
 
     GEPA mutates each section predictor's instructions independently.
-    evolved_sections() reads all 11 predictors' instructions and reconstructs
+    evolved_sections() reads all predictors' instructions and reconstructs
     the full body by joining evolved section texts.
-
-    Returns the evolved body string, or original_body if no changes detected.
     """
     try:
         if hasattr(optimized_module, 'evolved_sections') and hasattr(optimized_module, 'sections'):
@@ -61,6 +59,70 @@ def multi_component_extract(optimized_module, original_body: str, sections) -> s
     return original_body
 
 
+def _create_gepa_optimizer(iterations: int, optimizer_model: str):
+    """Create a DSPy 3.x GEPA optimizer with bounded metric-call budget."""
+    reflection_lm = dspy.LM(optimizer_model)
+    return dspy.GEPA(
+        metric=skill_fitness_metric,
+        max_metric_calls=max(1, iterations * 20),
+        reflection_minibatch_size=15,
+        reflection_lm=reflection_lm,
+    )
+
+
+def _run_pytest_gate_if_requested(
+    validator: ConstraintValidator,
+    config: EvolutionConfig,
+) -> Optional[ConstraintResult]:
+    """Run the pytest promotion gate when enabled."""
+    if not config.run_pytest:
+        return None
+    return validator.run_test_suite(config.hermes_agent_path)
+
+
+def _save_failed_variant(skill_name: str, evolved_full: str, suffix: str = "FAILED") -> Path:
+    """Save a rejected evolved skill variant for inspection."""
+    output_path = Path("output") / skill_name / f"evolved_{suffix}.md"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(evolved_full)
+    return output_path
+
+
+def _require_non_empty_holdout(dataset: EvalDataset) -> None:
+    """Fail fast when holdout scoring would be meaningless."""
+    if dataset.holdout:
+        return
+    total = len(dataset.all_examples)
+    raise click.ClickException(
+        "Evaluation dataset has 0 holdout examples; cannot compute an "
+        f"independent holdout score from {total} total examples. Provide a "
+        "larger dataset or adjust train/val/holdout ratios."
+    )
+
+
+def _require_constraints_pass(
+    results: list[ConstraintResult],
+    *,
+    artifact_label: str,
+) -> None:
+    """Fail fast when a required constraint gate has failures."""
+    failures = [result for result in results if not result.passed]
+    if not failures:
+        return
+    details = "; ".join(
+        f"{failure.constraint_name}: {failure.message}" for failure in failures
+    )
+    raise click.ClickException(f"{artifact_label} failed constraints: {details}")
+
+
+def _validate_baseline_constraints(
+    skill: dict,
+    validator: ConstraintValidator,
+) -> list[ConstraintResult]:
+    """Validate the complete baseline skill file, including frontmatter."""
+    return validator.validate_all(skill["raw"], "skill")
+
+
 def evolve(
     skill_name: str,
     iterations: int = 10,
@@ -72,6 +134,10 @@ def evolve(
     run_tests: bool = False,
     dry_run: bool = False,
     stats_csv: Optional[str] = None,
+    write_report: bool = True,
+    report_dir: str = "reports/runs",
+    run_benchmark_gate: bool = False,
+    prepare_pr: bool = False,
 ):
     """Main evolution function — orchestrates the full optimization loop."""
 
@@ -148,21 +214,18 @@ def evolve(
         sys.exit(1)
 
     console.print(f"  Split: {len(dataset.train)} train / {len(dataset.val)} val / {len(dataset.holdout)} holdout")
+    _require_non_empty_holdout(dataset)
 
     # ── 3. Validate constraints on baseline ─────────────────────────────
     console.print(f"\n[bold]Validating baseline constraints[/bold]")
     validator = ConstraintValidator(config)
-    baseline_constraints = validator.validate_all(skill["raw"], "skill")
-    all_pass = True
+    baseline_constraints = _validate_baseline_constraints(skill, validator)
     for c in baseline_constraints:
         icon = "✓" if c.passed else "✗"
         color = "green" if c.passed else "red"
         console.print(f"  [{color}]{icon} {c.constraint_name}[/{color}]: {c.message}")
-        if not c.passed:
-            all_pass = False
 
-    if not all_pass:
-        console.print("[yellow]⚠ Baseline skill has constraint violations — proceeding anyway[/yellow]")
+    _require_constraints_pass(baseline_constraints, artifact_label="Baseline skill")
 
     # ── 4. Set up DSPy + GEPA optimizer ─────────────────────────────────
     console.print(f"\n[bold]Configuring optimizer[/bold]")
@@ -197,16 +260,7 @@ def evolve(
     start_time = time.time()
 
     try:
-        ref_lm_kwargs, optimizer_model_used = _get_lm_kwargs(optimizer_model)
-        ref_lm_kwargs["num_retries"] = 8
-        ref_lm = dspy.LM(optimizer_model_used, **ref_lm_kwargs)
-        # PR #35: use max_metric_calls (not max_full_evals); do NOT mix with auto="light"
-        optimizer = dspy.GEPA(
-            metric=skill_fitness_metric,
-            max_metric_calls=iterations * 20,  # metric calls budget (larger minibatch = more calls)
-            reflection_minibatch_size=15,  # evaluate each candidate on 15 examples for signal
-            reflection_lm=ref_lm,
-        )
+        optimizer = _create_gepa_optimizer(iterations, optimizer_model)
 
         optimized_module = optimizer.compile(
             baseline_module,
@@ -260,13 +314,11 @@ def evolve(
     if not all_pass:
         console.print("[red]✗ Evolved skill FAILED constraints — not deploying[/red]")
         # Still save for inspection
-        output_path = Path("output") / skill_name / "evolved_FAILED.md"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(evolved_full)
+        output_path = _save_failed_variant(skill_name, evolved_full)
         console.print(f"  Saved failed variant to {output_path}")
         return
 
-    # ── 7b. Purpose Preservation Check ──────────────────────────────────
+# ── 7b. Purpose Preservation Check ──────────────────────────────────
     # Block type-changing evolutions (documentation -> consultant-prompt)
     from evolution.core.constraints_v2 import PurposePreservationChecker, extract_body
     purpose_check = PurposePreservationChecker()
@@ -275,14 +327,26 @@ def evolve(
     if not purpose_ok:
         console.print(f"[red]✗ Purpose lost: {purpose_msg[:120]}[/red]")
         console.print("[red]✗ Not deploying type-changing evolution[/red]")
-        output_path = Path("output") / skill_name / "evolved_FAILED.md"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(evolved_full)
+        output_path = _save_failed_variant(skill_name, evolved_full)
         console.print(f"  Saved failed variant to {output_path}")
         return
     console.print(f"[green]✓ Purpose preserved[/green]")
 
-    # ── 8. Evaluate on holdout set ───────────────────────────────────────
+    # ── 8. Optional pytest promotion gate ────────────────────────────────
+    pytest_result = _run_pytest_gate_if_requested(validator, config)
+    if pytest_result is not None:
+        icon = "✓" if pytest_result.passed else "✗"
+        color = "green" if pytest_result.passed else "red"
+        console.print(f"  [{color}]{icon} {pytest_result.constraint_name}[/{color}]: {pytest_result.message}")
+        if pytest_result.details:
+            console.print(f"    {pytest_result.details}")
+        if not pytest_result.passed:
+            console.print("[red]✗ Evolved skill FAILED pytest gate — not deploying[/red]")
+            output_path = _save_failed_variant(skill_name, evolved_full, "FAILED_TESTS")
+            console.print(f"  Saved failed variant to {output_path}")
+            return
+
+    # ── 9. Evaluate on holdout set ──────────────────────────────────────
     console.print(f"\n[bold]Evaluating on holdout set ({len(dataset.holdout)} examples)[/bold]")
 
     holdout_examples = dataset.to_dspy_examples("holdout")
@@ -294,17 +358,17 @@ def evolve(
         with dspy.context(lm=lm):
             baseline_pred = baseline_module(task_input=ex.task_input)
             baseline_score = skill_fitness_metric(ex, baseline_pred)
-            baseline_scores.append(baseline_score)
+            baseline_scores.append(float(baseline_score))
 
             evolved_pred = optimized_module(task_input=ex.task_input)
             evolved_score = skill_fitness_metric(ex, evolved_pred)
-            evolved_scores.append(evolved_score)
+            evolved_scores.append(float(evolved_score))
 
     avg_baseline = sum(baseline_scores) / max(1, len(baseline_scores))
     avg_evolved = sum(evolved_scores) / max(1, len(evolved_scores))
     improvement = avg_evolved - avg_baseline
 
-    # ── 9. Report results ───────────────────────────────────────────────
+    # ── 10. Report results ──────────────────────────────────────────────
     table = Table(title="Evolution Results")
     table.add_column("Metric", style="bold")
     table.add_column("Baseline", justify="right")
@@ -330,7 +394,7 @@ def evolve(
     console.print()
     console.print(table)
 
-    # ── 10. Save output ─────────────────────────────────────────────────
+    # ── 11. Save output ─────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = Path("output") / skill_name / timestamp
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -362,6 +426,45 @@ def evolve(
         "constraints_passed": all_pass,
     }
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
+
+    if write_report:
+        from evolution.core.benchmark_gate import evaluate_report
+        from evolution.core.pr_builder import build_pr_text
+        from evolution.core.run_report import write_run_report
+
+        report_path = write_run_report(
+            target_name=skill_name,
+            target_type="skill",
+            baseline_path=output_dir / "baseline_skill.md",
+            optimized_path=output_dir / "evolved_skill.md",
+            dataset=dataset,
+            optimizer_model=optimizer_model,
+            eval_model=eval_model,
+            optimizer_type=type(optimizer).__name__,
+            constraints=evolved_constraints,
+            baseline_score=avg_baseline,
+            optimized_score=avg_evolved,
+            elapsed_seconds=elapsed,
+            report_dir=Path(report_dir),
+        )
+        console.print(f"  Run report: {report_path}")
+
+        if run_benchmark_gate:
+            gate_result = evaluate_report(report_path)
+            report = json.loads(report_path.read_text())
+            report["benchmark_gate"] = gate_result.to_dict()
+            report_path.write_text(json.dumps(report, indent=2, sort_keys=True))
+            gate_label = "PASS" if gate_result.passed else "FAIL"
+            console.print(f"  Benchmark gate: {gate_label}")
+            if not gate_result.passed:
+                console.print("[red]✗ Benchmark gate failed — not preparing PR[/red]")
+                prepare_pr = False
+
+        if prepare_pr:
+            title, body = build_pr_text(report_path)
+            pr_body_path = output_dir / "PR_BODY.md"
+            pr_body_path.write_text(f"# {title}\n\n{body}\n")
+            console.print(f"  PR body: {pr_body_path}")
 
     console.print(f"\n  Output saved to {output_dir}/")
 
@@ -427,8 +530,12 @@ def evolve(
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")
 @click.option("--stats-csv", default=None, help="Append run stats to a CSV file for analysis")
+@click.option("--write-report/--no-write-report", default=True, help="Write a machine-readable run report")
+@click.option("--report-dir", default="reports/runs", help="Directory for run reports")
+@click.option("--run-benchmark-gate", is_flag=True, help="Evaluate the run report with benchmark gates")
+@click.option("--prepare-pr", is_flag=True, help="Write a local PR body artifact from the run report")
 @click.option("--v2", is_flag=True, help="Use GEPA v2.1 pipeline (Router + robustness gates + backtrack)")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv, v2):
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run, stats_csv, write_report, report_dir, run_benchmark_gate, prepare_pr, v2):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
     if v2:
         from evolution.core.gepa_v2_dispatch import v2_dispatch
@@ -456,6 +563,10 @@ def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_mod
             run_tests=run_tests,
             dry_run=dry_run,
             stats_csv=stats_csv,
+            write_report=write_report,
+            report_dir=report_dir,
+            run_benchmark_gate=run_benchmark_gate,
+            prepare_pr=prepare_pr,
         )
 
 
