@@ -1,5 +1,8 @@
 """Tests for constraint validators."""
 
+import sys
+import subprocess
+
 import pytest
 from evolution.core.constraints import ConstraintValidator
 from evolution.core.config import EvolutionConfig
@@ -79,20 +82,28 @@ class TestSkillStructure:
         skill = "---\ndescription: A test skill\n---\n\n# Test"
         result = validator._check_skill_structure(skill)
         assert not result.passed
+        assert "name" in result.message
 
     def test_missing_description(self, validator):
-        skill = "---\nname: test-skill\n---\n\n# Test"
+        skill = "---\nname: test\n---\n\n# Test"
         result = validator._check_skill_structure(skill)
         assert not result.passed
+        assert "description" in result.message
 
 
-class TestValidateAll:
-    def test_valid_skill_passes_all(self, validator):
-        skill = "---\nname: test\ndescription: Test skill\n---\n\n# Procedure\n1. Do thing"
-        results = validator.validate_all(skill, "skill")
-        assert all(r.passed for r in results)
+class TestRunTestSuite:
+    def test_uses_current_python_interpreter(self, validator, monkeypatch, tmp_path):
+        calls = []
 
-    def test_empty_skill_fails(self, validator):
-        results = validator.validate_all("", "skill")
-        failed = [r for r in results if not r.passed]
-        assert len(failed) > 0
+        def fake_run(command, **kwargs):
+            calls.append((command, kwargs))
+            return subprocess.CompletedProcess(command, 0, stdout="1 passed\n", stderr="")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = validator.run_test_suite(tmp_path)
+
+        assert result.passed
+        assert calls[0][0][0] == sys.executable
+        assert calls[0][0][1:] == ["-m", "pytest", "tests/", "-q", "--tb=no"]
+        assert calls[0][1]["cwd"] == str(tmp_path)

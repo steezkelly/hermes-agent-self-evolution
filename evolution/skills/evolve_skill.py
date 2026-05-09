@@ -22,7 +22,7 @@ from evolution.core.config import EvolutionConfig, get_hermes_agent_path
 from evolution.core.dataset_builder import SyntheticDatasetBuilder, EvalDataset, GoldenDatasetLoader
 from evolution.core.external_importers import build_dataset_from_external
 from evolution.core.fitness import skill_fitness_metric, LLMJudge, FitnessScore
-from evolution.core.constraints import ConstraintValidator
+from evolution.core.constraints import ConstraintValidator, ConstraintResult
 from evolution.skills.skill_module import (
     SkillModule,
     load_skill,
@@ -31,6 +31,29 @@ from evolution.skills.skill_module import (
 )
 
 console = Console()
+
+
+def _run_pytest_gate_if_requested(
+    validator: ConstraintValidator,
+    config: EvolutionConfig,
+) -> Optional[ConstraintResult]:
+    """Run the pytest promotion gate when enabled.
+
+    Returns the test-suite constraint result when ``config.run_pytest`` is true;
+    otherwise returns ``None`` so callers can distinguish "skipped" from
+    "passed".
+    """
+    if not config.run_pytest:
+        return None
+    return validator.run_test_suite(config.hermes_agent_path)
+
+
+def _save_failed_variant(skill_name: str, evolved_full: str, suffix: str = "FAILED") -> Path:
+    """Save a rejected evolved skill variant for inspection."""
+    output_path = Path("output") / skill_name / f"evolved_{suffix}.md"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(evolved_full)
+    return output_path
 
 
 def evolve(
@@ -198,13 +221,25 @@ def evolve(
     if not all_pass:
         console.print("[red]✗ Evolved skill FAILED constraints — not deploying[/red]")
         # Still save for inspection
-        output_path = Path("output") / skill_name / "evolved_FAILED.md"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(evolved_full)
+        output_path = _save_failed_variant(skill_name, evolved_full)
         console.print(f"  Saved failed variant to {output_path}")
         return
 
-    # ── 8. Evaluate on holdout set ──────────────────────────────────────
+    # ── 8. Optional pytest promotion gate ────────────────────────────────
+    pytest_result = _run_pytest_gate_if_requested(validator, config)
+    if pytest_result is not None:
+        icon = "✓" if pytest_result.passed else "✗"
+        color = "green" if pytest_result.passed else "red"
+        console.print(f"  [{color}]{icon} {pytest_result.constraint_name}[/{color}]: {pytest_result.message}")
+        if pytest_result.details:
+            console.print(f"    {pytest_result.details}")
+        if not pytest_result.passed:
+            console.print("[red]✗ Evolved skill FAILED pytest gate — not deploying[/red]")
+            output_path = _save_failed_variant(skill_name, evolved_full, "FAILED_TESTS")
+            console.print(f"  Saved failed variant to {output_path}")
+            return
+
+    # ── 9. Evaluate on holdout set ──────────────────────────────────────
     console.print(f"\n[bold]Evaluating on holdout set ({len(dataset.holdout)} examples)[/bold]")
 
     holdout_examples = dataset.to_dspy_examples("holdout")
@@ -226,7 +261,7 @@ def evolve(
     avg_evolved = sum(evolved_scores) / max(1, len(evolved_scores))
     improvement = avg_evolved - avg_baseline
 
-    # ── 9. Report results ───────────────────────────────────────────────
+    # ── 10. Report results ──────────────────────────────────────────────
     table = Table(title="Evolution Results")
     table.add_column("Metric", style="bold")
     table.add_column("Baseline", justify="right")
@@ -252,7 +287,7 @@ def evolve(
     console.print()
     console.print(table)
 
-    # ── 10. Save output ─────────────────────────────────────────────────
+    # ── 11. Save output ─────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = Path("output") / skill_name / timestamp
     output_dir.mkdir(parents=True, exist_ok=True)
