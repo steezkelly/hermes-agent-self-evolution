@@ -23,6 +23,7 @@ from evolution.core.dataset_builder import SyntheticDatasetBuilder, EvalDataset,
 from evolution.core.external_importers import build_dataset_from_external
 from evolution.core.fitness import skill_fitness_metric, LLMJudge, FitnessScore
 from evolution.core.constraints import ConstraintValidator
+from evolution.core.run_report import write_run_report
 from evolution.skills.skill_module import (
     SkillModule,
     load_skill,
@@ -197,11 +198,41 @@ def evolve(
 
     if not all_pass:
         console.print("[red]✗ Evolved skill FAILED constraints — not deploying[/red]")
-        # Still save for inspection
-        output_path = Path("output") / skill_name / "evolved_FAILED.md"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(evolved_full)
-        console.print(f"  Saved failed variant to {output_path}")
+        # Still save for inspection and promotion audit.
+        failed_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        failed_output_dir = Path("output") / skill_name / failed_timestamp
+        failed_output_dir.mkdir(parents=True, exist_ok=True)
+        failed_output_path = failed_output_dir / "evolved_FAILED.md"
+        failed_output_path.write_text(evolved_full)
+        (failed_output_dir / "baseline_skill.md").write_text(skill["raw"])
+        report_path = write_run_report(
+            report_dir=Path("reports") / "runs",
+            target_name=skill_name,
+            artifact_type="skill",
+            baseline_artifact=skill["raw"],
+            optimized_artifact=evolved_full,
+            dataset_source=eval_source,
+            split_counts={
+                "train": len(dataset.train),
+                "val": len(dataset.val),
+                "holdout": len(dataset.holdout),
+            },
+            optimizer_model=optimizer_model,
+            eval_model=eval_model,
+            baseline_score=None,
+            evolved_score=None,
+            constraints=evolved_constraints,
+            elapsed_seconds=elapsed,
+            output_dir=failed_output_dir,
+            diff_path=failed_output_dir / "skill.diff",
+            timestamp=failed_timestamp,
+            extra={
+                "iterations": iterations,
+                "status": "failed_constraints",
+            },
+        )
+        console.print(f"  Saved failed variant to {failed_output_path}")
+        console.print(f"  Run report saved to {report_path}")
         return
 
     # ── 8. Evaluate on holdout set ──────────────────────────────────────
@@ -283,7 +314,32 @@ def evolve(
     }
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
 
+    report_path = write_run_report(
+        report_dir=Path("reports") / "runs",
+        target_name=skill_name,
+        artifact_type="skill",
+        baseline_artifact=skill["raw"],
+        optimized_artifact=evolved_full,
+        dataset_source=eval_source,
+        split_counts={
+            "train": len(dataset.train),
+            "val": len(dataset.val),
+            "holdout": len(dataset.holdout),
+        },
+        optimizer_model=optimizer_model,
+        eval_model=eval_model,
+        baseline_score=avg_baseline,
+        evolved_score=avg_evolved,
+        constraints=evolved_constraints,
+        elapsed_seconds=elapsed,
+        output_dir=output_dir,
+        diff_path=output_dir / "skill.diff",
+        timestamp=timestamp,
+        extra={"iterations": iterations},
+    )
+
     console.print(f"\n  Output saved to {output_dir}/")
+    console.print(f"  Run report saved to {report_path}")
 
     if improvement > 0:
         console.print(f"\n[bold green]✓ Evolution improved skill by {improvement:+.3f} ({improvement/max(0.001, avg_baseline)*100:+.1f}%)[/bold green]")
