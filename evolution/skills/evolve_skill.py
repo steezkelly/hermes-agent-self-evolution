@@ -33,6 +33,19 @@ from evolution.skills.skill_module import (
 console = Console()
 
 
+def _run_tblite_gate_if_requested(config: EvolutionConfig) -> None:
+    """Fail loudly until the TBLite benchmark gate has a real implementation."""
+    if not config.run_tblite:
+        return
+
+    raise click.ClickException(
+        "TBLite benchmark gate requested, but TBLite execution is not implemented "
+        "in this repository yet. Re-run with run_tblite=False / without "
+        "--run-tblite, or implement evolution/core/benchmark_gate.py before "
+        "treating this run as benchmark-gated."
+    )
+
+
 def evolve(
     skill_name: str,
     iterations: int = 10,
@@ -42,6 +55,7 @@ def evolve(
     eval_model: str = "openai/gpt-4.1-mini",
     hermes_repo: Optional[str] = None,
     run_tests: bool = False,
+    run_tblite: bool = False,
     dry_run: bool = False,
 ):
     """Main evolution function — orchestrates the full optimization loop."""
@@ -52,7 +66,9 @@ def evolve(
         eval_model=eval_model,
         judge_model=eval_model,  # Use same model for dataset generation
         run_pytest=run_tests,
+        run_tblite=run_tblite,
     )
+    _run_tblite_gate_if_requested(config)
     if hermes_repo:
         config.hermes_agent_path = Path(hermes_repo)
 
@@ -303,8 +319,9 @@ def evolve(
 @click.option("--eval-model", default="openai/gpt-4.1-mini", help="Model for evaluations")
 @click.option("--hermes-repo", default=None, help="Path to hermes-agent repo")
 @click.option("--run-tests", is_flag=True, help="Run full pytest suite as constraint gate")
+@click.option("--run-tblite", is_flag=True, help="Require TBLite benchmark gate before accepting evolution")
 @click.option("--dry-run", is_flag=True, help="Validate setup without running optimization")
-def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, dry_run):
+def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_model, hermes_repo, run_tests, run_tblite, dry_run):
     """Evolve a Hermes Agent skill using DSPy + GEPA optimization."""
     evolve(
         skill_name=skill,
@@ -315,6 +332,7 @@ def main(skill, iterations, eval_source, dataset_path, optimizer_model, eval_mod
         eval_model=eval_model,
         hermes_repo=hermes_repo,
         run_tests=run_tests,
+        run_tblite=run_tblite,
         dry_run=dry_run,
     )
 
