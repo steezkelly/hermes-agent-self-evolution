@@ -27,7 +27,22 @@ from evolution.core.attention_router_bridge import run_attention_router_bridge
 from evolution.core.real_trace_ingestion import run_real_trace_ingestion
 
 _FIXED_GENERATED_AT = "1970-01-01T00:00:00Z"
-_SUPPORTED_MODES = ["chain", "chain_optimize"]
+_SUPPORTED_MODES = ["chain", "chain_optimize", "chain_gepa"]
+
+
+def _summarize_gepa_bridge(gepa_dir: Path) -> dict[str, Any]:
+    run_report_path = (gepa_dir / "run_report.json").resolve()
+    if not run_report_path.is_file():
+        return {"verdict": "not_run", "datasets": 0}
+    run_report = _load_json(run_report_path)
+    manifest_path = (gepa_dir / "gepa_manifest.json").resolve()
+    return {
+        "run_report": str(run_report_path),
+        "manifest": str(manifest_path) if manifest_path.is_file() else "",
+        "verdict": run_report.get("verdict", "not_run"),
+        "datasets_built": run_report.get("datasets_built", 0),
+        "total_examples": run_report.get("total_examples", 0),
+    }
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -185,6 +200,7 @@ def _build_chain_report(
     bridge: dict[str, Any],
     action_items: list[dict[str, Any]],
     optimizer: dict[str, Any] | None = None,
+    gepa: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     baseline = _baseline_chain_output()
     baseline_eval = evaluate_chain_run(baseline)
@@ -197,13 +213,21 @@ def _build_chain_report(
     steps = [ingestion.get("verdict"), bridge.get("verdict")]
     if optimizer and optimizer.get("verdict") != "not_run":
         steps.append(optimizer.get("verdict"))
+    if gepa and gepa.get("verdict") != "not_run":
+        steps.append(gepa.get("verdict"))
     steps_passed = sum(1 for verdict in steps if verdict == "pass")
     steps_failed = len(steps) - steps_passed
+
+    mode = "chain"
+    if gepa and gepa.get("verdict") != "not_run":
+        mode = "chain_gepa"
+    elif optimizer and optimizer.get("verdict") != "not_run":
+        mode = "chain_optimize"
 
     report = {
         "schema_version": 1,
         "generated_at": _FIXED_GENERATED_AT,
-        "mode": "chain_optimize" if optimizer and optimizer.get("verdict") != "not_run" else "chain",
+        "mode": mode,
         "task_type": "session_end_chain",
         "source_trace": str(trace_path.resolve()),
         "external_writes_allowed": False,
@@ -212,12 +236,18 @@ def _build_chain_report(
         "bridge": bridge,
         "action_items": action_items,
         "optimizer": optimizer if optimizer and optimizer.get("verdict") != "not_run" else None,
+        "gepa_bridge": gepa if gepa and gepa.get("verdict") != "not_run" else None,
         "metrics": {
             "detected_failure_count": ingestion.get("failure_count", 0),
             "action_items_aggregated": len(action_items),
             "improvements_generated": (
                 optimizer.get("improvement_count", 0)
                 if optimizer and optimizer.get("verdict") != "not_run"
+                else 0
+            ),
+            "gepa_datasets_built": (
+                gepa.get("datasets_built", 0)
+                if gepa and gepa.get("verdict") != "not_run"
                 else 0
             ),
             "steps_passed": steps_passed,
@@ -250,13 +280,14 @@ def _build_chain_report(
     return report
 
 
-def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = False) -> dict[str, Any]:
+def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = False, gepa_bridge: bool = False) -> dict[str, Any]:
     """Run real-trace ingestion then attention-router bridge and aggregate results.
 
     Args:
         trace_path: Path to exported Hermes JSONL session trace.
         out_dir: Output directory for all artifacts.
         optimize: If True, also run trace_optimizer stage after bridge.
+        gepa_bridge: If True, run optimizer + GEPA bridge stage.
     """
     trace_path = Path(trace_path).resolve()
     out_dir = Path(out_dir).resolve()
@@ -273,10 +304,20 @@ def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = F
     bridge = _summarize_bridge(bridge_dir, action_items)
 
     optimizer = None
-    if optimize:
+    gepa = None
+    if optimize or gepa_bridge:
         optimizer_dir = out_dir / "trace_optimizer"
         _run_optimizer_stage(ingestion_dir, optimizer_dir)
         optimizer = _summarize_optimizer(optimizer_dir)
+
+    if gepa_bridge:
+        gepa_dir = out_dir / "gepa_bridge"
+        from evolution.core.gepa_trace_bridge import run_gepa_bridge as run_gepa
+        run_gepa(
+            candidate_artifacts_path=optimizer_dir / "candidate_artifacts.json",
+            output_dir=gepa_dir,
+        )
+        gepa = _summarize_gepa_bridge(gepa_dir)
 
     report = _build_chain_report(
         out_dir=out_dir,
@@ -285,6 +326,7 @@ def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = F
         bridge=bridge,
         action_items=action_items,
         optimizer=optimizer,
+        gepa=gepa,
     )
     _write_json(out_dir / "chain_run.json", report)
     return report
@@ -299,10 +341,13 @@ def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = F
     help="Path to an exported Hermes session JSONL trace.",
 )
 @click.option("--out", "out_dir", required=True, type=click.Path(file_okay=False, path_type=Path))
-@click.option("--mode", required=True, type=click.Choice(["chain", "chain_optimize"]))
+@click.option("--mode", required=True, type=click.Choice(["chain", "chain_optimize", "chain_gepa"]))
 @click.option("--no-network", is_flag=True, default=False)
 @click.option("--no-external-writes", is_flag=True, default=False)
 @click.option("--optimize", is_flag=True, default=False, help="Run trace_optimizer stage after bridge.")
+@click.option("--gepa", is_flag=True, default=False, help="Run optimizer + GEPA bridge stage after bridge.")
+@click.option("--optimizer-model", type=str, default="minimax/minimax-m2.7")
+@click.option("--eval-model", type=str, default="minimax/minimax-m2.7")
 def main(
     trace_path: Path,
     out_dir: Path,
@@ -310,6 +355,9 @@ def main(
     no_network: bool,
     no_external_writes: bool,
     optimize: bool,
+    gepa: bool,
+    optimizer_model: str,
+    eval_model: str,
 ) -> None:
     """Run the local session-end real-trace -> action-item chain."""
     if mode not in _SUPPORTED_MODES:
@@ -319,8 +367,9 @@ def main(
     if not no_external_writes:
         raise click.ClickException("--no-external-writes is required")
 
-    do_optimize = optimize or (mode == "chain_optimize")
-    result = run_session_end_chain(trace_path, out_dir, optimize=do_optimize)
+    do_gepa = gepa or (mode == "chain_gepa")
+    do_optimize = optimize or (mode == "chain_optimize") or do_gepa
+    result = run_session_end_chain(trace_path, out_dir, optimize=do_optimize, gepa_bridge=do_gepa)
     if result["verdict"] != "pass":
         raise click.ClickException("session-end chain gate failed")
 
