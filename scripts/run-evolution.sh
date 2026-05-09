@@ -35,7 +35,7 @@ fi
 PROVIDER="${PROVIDER:-openrouter}"
 
 # Load the virtual environment
-source "$SCRIPT_DIR/venv/bin/activate"
+source "$SCRIPT_DIR/.venv/bin/activate"
 
 # Determine the Python module path prefix based on provider.
 # nous_auth.py handles credential resolution for both 'nous' and 'openrouter'.
