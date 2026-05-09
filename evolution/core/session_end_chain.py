@@ -8,6 +8,8 @@ This module composes the real session trace chain:
    action items.
 3. ``session_end_chain.py`` aggregates both verdicts plus action items into one
    ``chain_run.json``.
+4. Optional ``trace_optimizer.py`` stage: converts detected failures into
+   candidate improvement templates (--optimize).
 
 Safety invariants: local files only; no network calls, GitHub writes, or
 production mutation.
@@ -25,6 +27,7 @@ from evolution.core.attention_router_bridge import run_attention_router_bridge
 from evolution.core.real_trace_ingestion import run_real_trace_ingestion
 
 _FIXED_GENERATED_AT = "1970-01-01T00:00:00Z"
+_SUPPORTED_MODES = ["chain", "chain_optimize"]
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -101,6 +104,30 @@ def _summarize_bridge(bridge_dir: Path, action_items: list[dict[str, Any]]) -> d
     }
 
 
+def _summarize_optimizer(optimizer_dir: Path) -> dict[str, Any]:
+    run_report_path = (optimizer_dir / "run_report.json").resolve()
+    if not run_report_path.is_file():
+        return {"verdict": "not_run", "improvement_count": 0}
+    run_report = _load_json(run_report_path)
+    return {
+        "run_report": str(run_report_path),
+        "verdict": run_report.get("verdict", "not_run"),
+        "improvement_count": len(run_report.get("improvements", [])),
+    }
+
+
+def _run_optimizer_stage(ingestion_dir: Path, output_dir: Path) -> dict[str, Any]:
+    """Run the trace optimizer as an optional chain stage."""
+    from evolution.core.trace_optimizer import run_optimizer
+
+    eval_path = ingestion_dir / "eval_examples.json"
+    return run_optimizer(
+        eval_examples_path=eval_path,
+        output_dir=output_dir,
+        mode="optimizer",
+    )
+
+
 def evaluate_chain_run(report: dict[str, Any]) -> dict[str, Any]:
     """Evaluate a session-end chain report with deterministic fail-closed checks."""
     failures: list[str] = []
@@ -157,6 +184,7 @@ def _build_chain_report(
     ingestion: dict[str, Any],
     bridge: dict[str, Any],
     action_items: list[dict[str, Any]],
+    optimizer: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     baseline = _baseline_chain_output()
     baseline_eval = evaluate_chain_run(baseline)
@@ -167,13 +195,15 @@ def _build_chain_report(
     }
     candidate_eval = evaluate_chain_run(candidate_seed)
     steps = [ingestion.get("verdict"), bridge.get("verdict")]
+    if optimizer and optimizer.get("verdict") != "not_run":
+        steps.append(optimizer.get("verdict"))
     steps_passed = sum(1 for verdict in steps if verdict == "pass")
     steps_failed = len(steps) - steps_passed
 
     report = {
         "schema_version": 1,
         "generated_at": _FIXED_GENERATED_AT,
-        "mode": "chain",
+        "mode": "chain_optimize" if optimizer and optimizer.get("verdict") != "not_run" else "chain",
         "task_type": "session_end_chain",
         "source_trace": str(trace_path.resolve()),
         "external_writes_allowed": False,
@@ -181,9 +211,15 @@ def _build_chain_report(
         "ingestion": ingestion,
         "bridge": bridge,
         "action_items": action_items,
+        "optimizer": optimizer if optimizer and optimizer.get("verdict") != "not_run" else None,
         "metrics": {
             "detected_failure_count": ingestion.get("failure_count", 0),
             "action_items_aggregated": len(action_items),
+            "improvements_generated": (
+                optimizer.get("improvement_count", 0)
+                if optimizer and optimizer.get("verdict") != "not_run"
+                else 0
+            ),
             "steps_passed": steps_passed,
             "steps_failed": steps_failed,
         },
@@ -214,8 +250,14 @@ def _build_chain_report(
     return report
 
 
-def run_session_end_chain(trace_path: Path, out_dir: Path) -> dict[str, Any]:
-    """Run real-trace ingestion then attention-router bridge and aggregate results."""
+def run_session_end_chain(trace_path: Path, out_dir: Path, *, optimize: bool = False) -> dict[str, Any]:
+    """Run real-trace ingestion then attention-router bridge and aggregate results.
+
+    Args:
+        trace_path: Path to exported Hermes JSONL session trace.
+        out_dir: Output directory for all artifacts.
+        optimize: If True, also run trace_optimizer stage after bridge.
+    """
     trace_path = Path(trace_path).resolve()
     out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -230,12 +272,19 @@ def run_session_end_chain(trace_path: Path, out_dir: Path) -> dict[str, Any]:
     ingestion = _summarize_ingestion(ingestion_dir)
     bridge = _summarize_bridge(bridge_dir, action_items)
 
+    optimizer = None
+    if optimize:
+        optimizer_dir = out_dir / "trace_optimizer"
+        _run_optimizer_stage(ingestion_dir, optimizer_dir)
+        optimizer = _summarize_optimizer(optimizer_dir)
+
     report = _build_chain_report(
         out_dir=out_dir,
         trace_path=trace_path,
         ingestion=ingestion,
         bridge=bridge,
         action_items=action_items,
+        optimizer=optimizer,
     )
     _write_json(out_dir / "chain_run.json", report)
     return report
@@ -250,25 +299,28 @@ def run_session_end_chain(trace_path: Path, out_dir: Path) -> dict[str, Any]:
     help="Path to an exported Hermes session JSONL trace.",
 )
 @click.option("--out", "out_dir", required=True, type=click.Path(file_okay=False, path_type=Path))
-@click.option("--mode", required=True, type=click.Choice(["chain"]))
+@click.option("--mode", required=True, type=click.Choice(["chain", "chain_optimize"]))
 @click.option("--no-network", is_flag=True, default=False)
 @click.option("--no-external-writes", is_flag=True, default=False)
+@click.option("--optimize", is_flag=True, default=False, help="Run trace_optimizer stage after bridge.")
 def main(
     trace_path: Path,
     out_dir: Path,
     mode: str,
     no_network: bool,
     no_external_writes: bool,
+    optimize: bool,
 ) -> None:
     """Run the local session-end real-trace -> action-item chain."""
-    if mode != "chain":
-        raise click.ClickException("only chain mode is supported")
+    if mode not in _SUPPORTED_MODES:
+        raise click.ClickException(f"unsupported mode: {mode!r}")
     if not no_network:
         raise click.ClickException("--no-network is required")
     if not no_external_writes:
         raise click.ClickException("--no-external-writes is required")
 
-    result = run_session_end_chain(trace_path, out_dir)
+    do_optimize = optimize or (mode == "chain_optimize")
+    result = run_session_end_chain(trace_path, out_dir, optimize=do_optimize)
     if result["verdict"] != "pass":
         raise click.ClickException("session-end chain gate failed")
 
