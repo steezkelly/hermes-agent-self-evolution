@@ -33,6 +33,21 @@ from evolution.skills.skill_module import (
 console = Console()
 
 
+def _create_gepa_optimizer(iterations: int, optimizer_model: str):
+    """Create a DSPy 3.x GEPA optimizer.
+
+    DSPy 3.x removed the old ``max_steps`` argument and requires a reflection
+    LM for GEPA's proposal/reflection loop. Keep this construction isolated so
+    it is easy to test against future DSPy API drift.
+    """
+    reflection_lm = dspy.LM(optimizer_model)
+    return dspy.GEPA(
+        metric=skill_fitness_metric,
+        max_metric_calls=max(1, iterations * 20),
+        reflection_lm=reflection_lm,
+    )
+
+
 def evolve(
     skill_name: str,
     iterations: int = 10,
@@ -154,10 +169,7 @@ def evolve(
     start_time = time.time()
 
     try:
-        optimizer = dspy.GEPA(
-            metric=skill_fitness_metric,
-            max_steps=iterations,
-        )
+        optimizer = _create_gepa_optimizer(iterations, optimizer_model)
 
         optimized_module = optimizer.compile(
             baseline_module,
