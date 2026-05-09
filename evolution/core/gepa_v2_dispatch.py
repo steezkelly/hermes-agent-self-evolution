@@ -35,6 +35,7 @@ from evolution.core.constraints_v2 import (
     SkillRegressionChecker,
     ScopeCreepChecker,
     PurposePreservationChecker,
+    ContentSemanticScorer,
 )
 from evolution.core.posthoc_analyzer import PostHocAnalyzer
 from evolution.skills.evolve_skill import evolve as v1_evolve
@@ -195,6 +196,10 @@ def v2_dispatch(
     regression = SkillRegressionChecker()
     scope = ScopeCreepChecker()
     purpose_check = PurposePreservationChecker()
+    # Fit ContentSemanticScorer on canonical baseline to detect format/type drift
+    # that keyword survival alone misses (e.g., mnemosyne tools → Background Process Analyzer)
+    content_scorer = ContentSemanticScorer().fit(baseline_body)
+    purpose_check.set_content_scorer(content_scorer)
     posthoc = PostHocAnalyzer(min_improvement_delta=0.03)
 
     best_body = baseline_body

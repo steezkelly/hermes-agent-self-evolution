@@ -143,39 +143,17 @@ class TestPurposePreservationChecker:
         assert status is True  # OK — baseline had consultant sections too
 
     def test_single_doc_section_baseline_reorganized_passes(self):
-        """Baseline with 1 doc section that gets reorganized → pass.
-
-        This was a false positive: the old logic rejected any <30% doc section
-        survival, which fired on legitimate restructurings of thin-baseline skills.
-        The fix requires BOTH prop_survival < threshold AND abs_survival < 1.
-        With exactly 1 doc section in baseline:
-          - prop_survival = 0% < 0.5 is True
-          - abs_survival = 0 < 1 is True
-          - condition = True AND True = True → FAIL (still fails on 1-section baselines!)
-
-        So the real fix is: the evolved must PRESERVE at least 1 doc section
-        even when reorganizing. This test verifies that when the evolved
-        keeps 1 doc section while changing the other to a non-doc heading,
-        the check passes (abs_survival >= 1 blocks the fail).
-        """
+        """Baseline with 1 doc section that gets reorganized → pass."""
         checker = PurposePreservationChecker()
-        # Baseline: Overview (doc) + Steps (doc → not retained in evolved)
         baseline = "# Test\n\n## Overview\nThis skill handles code review.\n## Steps\n1. Review\n"
-        # Evolved: retains "Overview" (doc), changes "Steps" → "How to Use" (non-doc)
         evolved = "# Test\n\n## Overview\nThis skill handles code review.\n## How to Use\n1. Review\n"
         status, _ = checker.check(evolved, baseline)
-        assert status is True  # Should pass — 1 doc section preserved (Overview)
+        assert status is True
 
     def test_content_semantic_similarity_catches_format_drift(self):
-        """When keywords survive but text distribution diverges → fail.
-
-        This catches the companion-workflows false negative: baseline is a
-        pattern-description reference doc, evolved is an execution instruction
-        sheet. Keywords overlap but the skill TYPE changed.
-        """
+        """When keywords survive but text distribution diverges → fail."""
         from evolution.core.constraints_v2 import ContentSemanticScorer
 
-        # Baseline: pattern-description reference doc
         baseline = """
 ## Pattern Selection
 Choose the workflow pattern based on task characteristics:
@@ -186,7 +164,6 @@ Choose the workflow pattern based on task characteristics:
 ## Execution Rules
 When using delegation, ensure the subagent has full context.
 """
-        # Evolved: execution instruction sheet — same keywords, different format
         evolved = """
 ## Task Input Format
 Describe the task clearly before invoking a workflow.
@@ -206,6 +183,78 @@ Evaluate outputs on accuracy, completeness, and consistency.
         status, msg = checker.check(evolved, baseline)
         assert status is False, f"Expected FAIL but got: {msg}"
         assert "content-semantic divergence" in msg
+
+    def test_mnemosyne_self_evolution_tools_purpose_drift_is_caught(self):
+        """Regression test: canonical mnemosyne tools baseline vs drifted evolved.
+
+        The evolved content drifted to 'Background Process Completion Analyzer' —
+        a completely different skill type. ContentSemanticScorer must catch this
+        even though keyword survival passes (both bodies contain 'debug', 'test',
+        'verify', etc.).
+
+        This test EXISTS because the original dispatch missed this failure.
+        v2_20260502_170705 recommended 'deploy' on the drifted content.
+        """
+        from pathlib import Path
+        from evolution.core.constraints_v2 import ContentSemanticScorer, extract_body
+
+        # Canonical baseline from first run: genuine Mnemosyne tools
+        canonical_path = Path(
+            "output/mnemosyne-self-evolution-tools/20260428_014049/baseline_skill.md"
+        )
+        if not canonical_path.exists():
+            # Fallback for CI / test environments without the file
+            canonical_body = (
+                "# Mnemosyne Self-Evolution Tools\n\n"
+                "Build standalone Python diagnostic tools for Mnemosyne. "
+                "Zero dependencies (stdlib only).\n\n"
+                "## When to Use\n"
+                "- Creating tools that analyze Mnemosyne DB health\n"
+                "- Building snapshot-based trend tracking\n"
+                "## Architecture Pattern: Snapshot + Trends\n"
+                "### Snapshot Structure\n"
+                "Use json with timestamp, version, metrics dict.\n"
+                "### Trend Calculation\n"
+                "Load snapshots, calculate deltas and percent changes.\n"
+                "## Testing Pattern\n"
+                "Test tools with real mnemosyne.db, verify outputs.\n"
+            )
+        else:
+            raw = canonical_path.read_text()
+            canonical_body = extract_body(raw)
+
+        # Drifted evolved: Background Process Completion Analyzer (wrong topic)
+        drifted_body = (
+            "# Background Process Completion Analyzer\n\n"
+            "## Task Overview\n"
+            "You will receive notifications about background processes that have completed. "
+            "Your job is to analyze these completions.\n\n"
+            "## Input Format\n"
+            "Background process proc_<ID> completed (exit code <N>).\n\n"
+            "## Key Components to Extract\n"
+            "1. Process ID\n"
+            "2. Exit Code (0=success, 1=failure, -15=SIGTERM)\n"
+            "3. Command\n"
+            "4. Output\n\n"
+            "## Output Structure Template\n"
+            "## Process Completion Summary\n"
+            "**Process**: proc_<ID>\n"
+            "**Exit Code**: N\n"
+            "## Domain Knowledge: Evolution Scripts\n"
+            "Evolution Parameters: --skill, --iterations, --eval-source\n"
+            "DSPy GEPA Optimization shows iteration scores.\n"
+        )
+
+        checker = PurposePreservationChecker()
+        scorer = ContentSemanticScorer().fit(canonical_body)
+        checker.set_content_scorer(scorer)
+
+        status, msg = checker.check(drifted_body, canonical_body)
+        assert status is False, (
+            "PURPOSE DRIFT NOT CAUGHT! ContentSemanticScorer should have "
+            "detected that 'Background Process Completion Analyzer' is not "
+            f"'Mnemosyne Self-Evolution Tools'. Got: {msg}"
+        )
 
     def test_content_semantic_similarity_allows_legitimate_improvement(self):
         """When keywords survive AND text distribution is similar → pass."""
@@ -286,4 +335,3 @@ Check accuracy and completeness.
         scorer = ContentSemanticScorer().fit(baseline)
         score, threshold = scorer.score("")
         assert score == 1.0  # Should default to 1.0 (no penalize empty)
-
