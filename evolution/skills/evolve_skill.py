@@ -71,6 +71,26 @@ def _save_failed_variant(skill_name: str, evolved_full: str, suffix: str = "FAIL
     return output_path
 
 
+def _require_non_empty_holdout(dataset: EvalDataset) -> None:
+    """Fail fast when holdout scoring would be meaningless.
+
+    Without holdout examples, the previous average-score calculation silently
+    produced 0.000/0.000 scores via ``max(1, len(scores))`` denominators. That
+    hides dataset construction mistakes and makes optimization reports look
+    valid when no independent evaluation occurred.
+    """
+    if dataset.holdout:
+        return
+
+    total = len(dataset.all_examples)
+    raise click.ClickException(
+        "Evaluation dataset has 0 holdout examples; cannot compute an "
+        f"independent holdout score from {total} total examples. Provide a "
+        "larger dataset or adjust train/val/holdout ratios."
+    )
+
+
+
 def evolve(
     skill_name: str,
     iterations: int = 10,
@@ -157,6 +177,7 @@ def evolve(
         sys.exit(1)
 
     console.print(f"  Split: {len(dataset.train)} train / {len(dataset.val)} val / {len(dataset.holdout)} holdout")
+    _require_non_empty_holdout(dataset)
 
     # ── 3. Validate constraints on baseline ─────────────────────────────
     console.print(f"\n[bold]Validating baseline constraints[/bold]")
