@@ -52,7 +52,11 @@ def cmd_health(args) -> int:
         generations_since=gens_since,
         skill_name=skill_filter,
     )
-    print(_format_health_report(report, logger.db_path))
+    if args.json:
+        import json
+        print(json.dumps(report.as_dict(), indent=2, default=str))
+    else:
+        print(_format_health_report(report, logger.db_path))
     return 0 if not report.alerts else 1
 
 
@@ -295,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     p_health = sub.add_parser("health", help="Run judge health report and alert check.")
     p_health.add_argument("--skill", default=None, help="Filter by skill name.")
     p_health.add_argument("--generation", type=int, default=None, help="Filter by generation number.")
+    p_health.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
     p_health.set_defaults(func=cmd_health)
 
     # stats
