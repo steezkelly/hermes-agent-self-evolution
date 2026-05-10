@@ -8,9 +8,15 @@ instructions + the task_input, producing a real agent response that gets
 scored against expected_behavior. This replaces the broken V2 behavior
 where the metric scored the raw 21KB skill body text (which naturally
 has high keyword overlap, creating a flat signal GEPA cannot optimize).
+
+v3 Observatory: All judge calls and metric evaluations are logged to
+judge_audit_log.db via evolution.core.observatory.
+
+v3.1 Cost: token_cost_estimate wired via token_cost.py.
 """
 
 import dspy
+import time as _time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -21,6 +27,24 @@ from sklearn.metrics.pairwise import cosine_similarity
 from evolution.core.config import EvolutionConfig
 from evolution.core.nous_auth import _get_lm_kwargs
 
+# Token cost estimation (Phase 3)
+try:
+    from evolution.core.token_cost import estimate_judge_call_cost
+    _TOKEN_COST_AVAILABLE = True
+except ImportError:
+    _TOKEN_COST_AVAILABLE = False
+    estimate_judge_call_cost = None
+
+# Observatory integration (Phase 1)
+try:
+    from evolution.core.observatory.logger import log_judge_call, JudgeAuditLogger
+    from evolution.core.observatory.context import get_evaluation_context
+    _OBSERVATORY_AVAILABLE = True
+except ImportError:
+    _OBSERVATORY_AVAILABLE = False
+    log_judge_call = None
+    get_evaluation_context = None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Inference wrapper — execute a skill body as agent instructions
@@ -29,21 +53,63 @@ from evolution.core.nous_auth import _get_lm_kwargs
 def _invoke_skill_as_agent(body_text: str, task_input: str) -> str:
     """Execute the skill body as agent instructions + task to get a generated response.
 
-    Uses the globally configured LM. Timeout/retry is handled at the LM level
-    (not via signal alarms, which break in threaded DSPy Evaluate contexts).
+    CRITICAL FIX (2026-05-03): This is called inside GEPA's threaded Evaluate
+    context, where dspy.settings.lm may be None. We MUST configure a fresh LM
+    directly rather than relying on global state. Previous code caught ALL
+    exceptions silently and returned '[metric-inference-failed]', making
+    every score 0.0 and hiding the real error.
     """
     if not body_text.strip() or not task_input.strip():
         return body_text
+
+    # Import here to avoid circular deps and to re-configure after fork
+    try:
+        from evolution.core.nous_auth import _get_lm_kwargs
+    except Exception:
+        _get_lm_kwargs = None
+
+    # Try to get a working LM. Priorities:
+    # 1. Use dspy.settings.lm if available (fast path, warm cache)
+    # 2. Re-configure via _get_lm_kwargs if available
+    # 3. Fail LOUDLY so we can see what went wrong (never silently)
+    lm = dspy.settings.lm
+
+    if lm is None and _get_lm_kwargs is not None:
+        try:
+            lm_kwargs_tuple = _get_lm_kwargs("minimax/minimax-m2.7")
+            if lm_kwargs_tuple and isinstance(lm_kwargs_tuple, tuple):
+                lm_kwargs = lm_kwargs_tuple[0].copy()
+                model_name = lm_kwargs_tuple[1]
+                lm_kwargs['model'] = model_name
+                lm_kwargs['request_timeout'] = 120
+                lm_kwargs['num_retries'] = 2
+                lm = dspy.LM(**lm_kwargs)
+        except Exception as exc:
+            # Log but re-raise — never silently swallow
+            print(f"[GEPA METRIC ERROR] Could not configure LM: {exc}")
+            raise
+
+    if lm is None:
+        raise RuntimeError(
+            "No LM available for metric inference. "
+            "dspy.settings.lm is None and _get_lm_kwargs failed. "
+            "Call dspy.configure(lm=...) before running GEPA."
+        )
 
     sig = dspy.Signature(
         "task_input: str -> response: str",
         instructions=body_text,
     )
+
+    # Use dspy.context to ensure the LM is active even in threads/subprocesses
     try:
-        result = dspy.Predict(sig)(task_input=task_input)
+        with dspy.context(lm=lm):
+            result = dspy.Predict(sig)(task_input=task_input)
         return result.response or ""
-    except Exception:
-        return "[metric-inference-failed]"
+    except Exception as exc:
+        # Fail loudly — never silently return a magic string
+        print(f"[GEPA METRIC ERROR] dspy.Predict failed: {type(exc).__name__}: {exc}")
+        raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +293,37 @@ class SentenceEmbeddingScorer:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# On-the-fly embedding fallback (for when globals are lost in subprocesses)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _on_the_fly_embed_score(agent_output: str, expected_behavior: str) -> Optional[float]:
+    """Compute a sentence-embedding cosine similarity with ZERO pre-caching.
+
+    Called when _embed_scorer or _global_scorer are unavailable (e.g. in a
+    forked worker thread created by GEPA's multiprocessing Evaluate). Loads
+    the all-MiniLM-L6-v2 model on first call (~30MB). Subsequent calls are
+    ~5ms.
+
+    Returns None if sentence_transformers is not installed or inputs are empty.
+    """
+    if not agent_output.strip() or not expected_behavior.strip():
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        return None
+    model = _on_the_fly_embed_score.__dict__.setdefault("_model", None)
+    if model is None:
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        _on_the_fly_embed_score._model = model
+    vecs = model.encode([agent_output, expected_behavior], show_progress_bar=False)
+    a_vec, e_vec = vecs[0], vecs[1]
+    sim = float(np.dot(a_vec, e_vec) /
+                (np.linalg.norm(a_vec) * np.linalg.norm(e_vec)))
+    return float(np.clip(sim, 0.0, 1.0))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Fitness Score Dataclass
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -290,114 +387,107 @@ class LLMJudge:
         max_size: Optional[int] = None,
     ) -> FitnessScore:
         """Score an agent output using LLM-as-judge."""
-        # Build kwargs for the judge model
-        kwargs, model_used = self._get_lm_kwargs(self.config.eval_model)
+        # ── Observatory: time the judge call ────────────────────────────────
+        start_ms = int(_time.time() * 1000)
+
+        # Use module-level _get_lm_kwargs imported from nous_auth.py.
+        # The old @staticmethod _get_lm_kwargs had a NameError because
+        # get_nous_credentials() is not imported into this module.
+        kwargs, model_used = _get_lm_kwargs(self.config.eval_model)
         lm = dspy.LM(model_used, **kwargs)
 
-        with dspy.context(lm=lm):
-            result = self.judge(
-                task_input=task_input,
-                expected_behavior=expected_behavior,
-                agent_output=agent_output,
-                skill_text=skill_text,
-            )
+        error_flag: Optional[str] = None
+        raw_score_value = 0.0
+        latency_ms: int = 0
 
-        # Parse scores (clamp to 0-1)
-        correctness = _parse_score(result.correctness)
-        procedure_following = _parse_score(result.procedure_following)
-        conciseness = _parse_score(result.conciseness)
-
-        # Length penalty
-        length_penalty = 0.0
-        if artifact_size is not None and max_size is not None:
-            ratio = artifact_size / max_size
-            if ratio > 0.9:
-                # Penalty ramps from 0 at 90% to 0.3 at 100%+
-                length_penalty = min(0.3, (ratio - 0.9) * 3.0)
-
-        return FitnessScore(
-            correctness=correctness,
-            procedure_following=procedure_following,
-            conciseness=conciseness,
-            length_penalty=length_penalty,
-            feedback=str(result.feedback),
-        )
-
-    @staticmethod
-    def _get_lm_kwargs(model: str) -> tuple:
-        """Build DSPy LM kwargs with correct provider routing.
-
-        Reimplements the provider detection logic from nous_auth.py
-        since that file's function was corrupted.
-        """
-        import os
-        model_lower = model.lower()
-        base_url = None
-        api_key = None
-
-        # 1. MiniMax models → MiniMax API directly
-        if model_lower.startswith("minimax/") or model_lower.startswith("minimax-"):
-            api_key = os.getenv("MINIMAX_API_KEY")
-            if api_key and api_key != "***" and api_key.strip():
-                base_url = os.getenv(
-                    "MINIMAX_BASE_URL", "https://api.minimax.io/anthropic/v1"
+        try:
+            with dspy.context(lm=lm):
+                result = self.judge(
+                    task_input=task_input,
+                    expected_behavior=expected_behavior,
+                    agent_output=agent_output,
+                    skill_text=skill_text,
                 )
 
-        # 2. DeepSeek models → Ollama Cloud
-        elif model_lower.startswith("deepseek-"):
-            api_key = os.getenv("OLLAMA_API_KEY")
-            if api_key and api_key != "***" and api_key.strip():
-                base_url = os.getenv("OLLAMA_BASE_URL", "https://ollama.com/v1")
+            # Parse scores (clamp to 0-1)
+            correctness = _parse_score(result.correctness)
+            procedure_following = _parse_score(result.procedure_following)
+            conciseness = _parse_score(result.conciseness)
 
-        # 3. OpenAI/OpenRouter models
-        elif model_lower.startswith("openai/") or model_lower.startswith("openrouter/"):
-            api_key = os.getenv("OPENROUTER_API_KEY")
-            if api_key and api_key != "***" and api_key.strip():
-                base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+            # Length penalty
+            length_penalty = 0.0
+            if artifact_size is not None and max_size is not None:
+                ratio = artifact_size / max_size
+                if ratio > 0.9:
+                    length_penalty = min(0.3, (ratio - 0.9) * 3.0)
 
-        # 4. Fallback: backward-compatible priority chain
-        if not base_url or not api_key:
-            base_url = None
-            api_key = None
-            chain_base = os.getenv("OPENROUTER_BASE_URL")
-            chain_key = os.getenv("OPENROUTER_API_KEY")
+            raw_score_value = (
+                0.5 * correctness
+                + 0.3 * procedure_following
+                + 0.2 * conciseness
+            )
+            raw_score_value = max(0.0, raw_score_value - length_penalty)
 
-            if not chain_base:
-                ollama_key = os.getenv("OLLAMA_API_KEY")
-                if ollama_key and ollama_key != "***" and ollama_key.strip():
-                    chain_base = os.getenv("OLLAMA_BASE_URL", "https://ollama.com/v1")
-                    chain_key = ollama_key
-                elif not chain_base:
-                    minimax_key = os.getenv("MINIMAX_API_KEY")
-                    if minimax_key and minimax_key != "***":
-                        chain_base = os.getenv(
-                            "MINIMAX_BASE_URL", "https://api.minimax.io/anthropic/v1"
-                        )
-                        chain_key = minimax_key
-                    else:
-                        nous = get_nous_credentials()
-                        if nous:
-                            chain_base = nous["base_url"]
-                            chain_key = nous["api_key"]
+            fitness_score = FitnessScore(
+                correctness=correctness,
+                procedure_following=procedure_following,
+                conciseness=conciseness,
+                length_penalty=length_penalty,
+                feedback=str(result.feedback),
+            )
 
-            base_url = chain_base
-            api_key = chain_key
+        except Exception as exc:
+            error_flag = type(exc).__name__
+            raw_score_value = 0.0
+            fitness_score = FitnessScore(
+                correctness=0.0,
+                procedure_following=0.0,
+                conciseness=0.0,
+                length_penalty=0.0,
+                feedback=f"[JUDGE ERROR] {error_flag}: {exc}",
+            )
 
-        if not base_url or not api_key or api_key == "***":
-            return {}, model
+        latency_ms = int(_time.time() * 1000) - start_ms
 
-        os.environ["OPENAI_API_KEY"] = api_key
+        # ── Observatory: log every judge call ──────────────────────────────
+        if _OBSERVATORY_AVAILABLE and log_judge_call is not None:
+            ctx = get_evaluation_context() if get_evaluation_context else None
+            generation = ctx.generation if ctx else 0
+            skill_name = ctx.skill_name if ctx else "unknown"
+            session_id = ctx.session_id if ctx else None
 
-        # Strip provider prefix for litellm routing — INCLUDING minimax
-        bare_model = model
-        if "/" in bare_model:
-            bare_model = bare_model.split("/", 1)[-1]
+            # v3.1: estimate cost for this judge call
+            token_cost: Optional[float] = None
+            if _TOKEN_COST_AVAILABLE and estimate_judge_call_cost is not None:
+                try:
+                    token_cost = estimate_judge_call_cost(
+                        task_input=task_input,
+                        expected_behavior=expected_behavior,
+                        agent_output=agent_output or "",
+                        skill_text=skill_text,
+                        model_name=model_used,
+                        feedback_text=fitness_score.feedback,
+                    )
+                except Exception:
+                    token_cost = None
 
-        kwargs = {
-            "api_base": base_url,
-            "custom_llm_provider": "openai",
-        }
-        return kwargs, bare_model
+            log_judge_call(
+                generation=generation,
+                skill_name=skill_name,
+                model_used=model_used,
+                task_id=ctx.task_id if ctx and ctx.task_id is not None else "",
+                expected_behavior=expected_behavior,
+                actual_behavior=agent_output[:500] if agent_output else "[empty]",
+                rubric="multi-dimensional: correctness, procedure_following, conciseness",
+                raw_score=raw_score_value,
+                latency_ms=latency_ms,
+                token_cost_estimate=token_cost,
+                error_flag=error_flag,
+                skill_body=skill_text,
+                session_id=session_id,
+            )
+
+        return fitness_score
 
 
 def _generate_feedback(

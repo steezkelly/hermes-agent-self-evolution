@@ -245,7 +245,20 @@ class SyntheticDatasetBuilder:
     """Generate evaluation datasets using a strong LLM."""
 
     class GenerateTestCases(dspy.Signature):
-        """Generate realistic evaluation test cases for an agent skill or tool."""
+        """Generate realistic evaluation test cases for an agent skill or tool.
+
+        IMPORTANT: The generated test cases MUST be structure-bound.
+        Structure-bound means the correct answer depends on following the skill's
+        exact organization, step order, or section-specific procedure.
+
+        BAD task: "What is the first step?" (answerable from any shuffled version)
+        GOOD task: "If the user already rebuilt the project cache, what is the NEXT step
+                     after that in the skill's procedure?" (requires knowing exact order)
+
+        Each test case should include a task_input that references a specific scenario
+        and an expected_behavior that explicitly names the next/previous step, the
+        exact section heading, or the precise ordering from the skill.
+        """
         artifact_text: str = dspy.InputField(desc="The full text of the skill/tool/prompt being tested")
         artifact_type: str = dspy.InputField(desc="Type: 'skill', 'tool_description', or 'prompt_section'")
         num_cases: int = dspy.InputField(desc="Number of test cases to generate")

@@ -23,7 +23,7 @@ from typing import Optional
 
 import dspy
 
-_MIN_SECTION_CHARS = 200
+_MIN_SECTION_CHARS = 0  # disabled: merges were losing important short sections
 
 
 def split_into_sections(body: str) -> list[dict]:
