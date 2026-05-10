@@ -4,11 +4,13 @@ import json
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from evolution.core.gepa_trace_bridge import (
     _build_dataset_for_class,
     _build_gepa_manifest,
     _CLASS_TO_EXAMPLES,
+    main as gepa_trace_bridge_main,
     run_gepa_bridge,
 )
 
@@ -228,3 +230,67 @@ class TestRunGepaBridge:
         cmd = manifest["datasets"][0]["command"]
         assert "gepa_v2_dispatch" in cmd
         assert "agent_describes_instead_of_calls_tools" in cmd
+
+class TestGepaTraceBridgeCliSafetyFlags:
+    """CLI safety flags must be opt-in and fail closed when omitted."""
+
+    def _candidate_artifacts(self, tmp_path):
+        artifacts = tmp_path / "cand.json"
+        artifacts.write_text(json.dumps({
+            "candidates": [
+                {
+                    "failure_class": "agent_describes_instead_of_calls_tools",
+                    "improvement_type": "prompt_patch",
+                    "candidate_constraint": "Use tools before describing.",
+                }
+            ]
+        }))
+        return artifacts
+
+    def test_no_network_and_no_external_writes_flags_allow_cli_run(self, tmp_path):
+        artifacts = self._candidate_artifacts(tmp_path)
+        out = tmp_path / "out"
+
+        result = CliRunner().invoke(
+            gepa_trace_bridge_main,
+            [
+                "--candidate-artifacts",
+                str(artifacts),
+                "--out",
+                str(out),
+                "--no-network",
+                "--no-external-writes",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        report = json.loads((out / "run_report.json").read_text())
+        assert report["safety"]["network_allowed"] is False
+        assert report["safety"]["external_writes_allowed"] is False
+
+    @pytest.mark.parametrize(
+        ("omitted_flag", "expected_message"),
+        [
+            ("--no-network", "network safety disabled"),
+            ("--no-external-writes", "external writes safety disabled"),
+        ],
+    )
+    def test_missing_safety_flag_fails_closed(
+        self, tmp_path, omitted_flag, expected_message
+    ):
+        artifacts = self._candidate_artifacts(tmp_path)
+        out = tmp_path / "out"
+        args = [
+            "--candidate-artifacts",
+            str(artifacts),
+            "--out",
+            str(out),
+            "--no-network",
+            "--no-external-writes",
+        ]
+        args.remove(omitted_flag)
+
+        result = CliRunner().invoke(gepa_trace_bridge_main, args)
+
+        assert result.exit_code != 0
+        assert expected_message in str(result.exception)

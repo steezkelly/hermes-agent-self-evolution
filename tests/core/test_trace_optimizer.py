@@ -4,11 +4,13 @@ import json
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from evolution.core.trace_optimizer import (
     _baseline_output,
     _candidate_output,
     _CANDIDATE_TEMPLATES,
+    main as trace_optimizer_main,
     run_optimizer,
 )
 
@@ -210,3 +212,58 @@ class TestRunOptimizerIntegration:
         assert s["network_allowed"] is False
         assert s["external_writes_allowed"] is False
         assert s["github_writes_allowed"] is False
+
+class TestTraceOptimizerCliSafetyFlags:
+    """CLI safety flags must be opt-in and fail closed when omitted."""
+
+    def test_no_network_and_no_external_writes_flags_allow_cli_run(self, tmp_path):
+        ep = _make_eval_examples(
+            tmp_path, ["long_briefing_instead_of_concise_action_queue"]
+        )
+        out = tmp_path / "out"
+
+        result = CliRunner().invoke(
+            trace_optimizer_main,
+            [
+                "--eval-examples",
+                str(ep),
+                "--out",
+                str(out),
+                "--no-network",
+                "--no-external-writes",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        report = json.loads((out / "run_report.json").read_text())
+        assert report["safety"]["network_allowed"] is False
+        assert report["safety"]["external_writes_allowed"] is False
+
+    @pytest.mark.parametrize(
+        ("omitted_flag", "expected_message"),
+        [
+            ("--no-network", "network safety disabled"),
+            ("--no-external-writes", "external writes safety disabled"),
+        ],
+    )
+    def test_missing_safety_flag_fails_closed(
+        self, tmp_path, omitted_flag, expected_message
+    ):
+        ep = _make_eval_examples(
+            tmp_path, ["long_briefing_instead_of_concise_action_queue"]
+        )
+        out = tmp_path / "out"
+        args = [
+            "--eval-examples",
+            str(ep),
+            "--out",
+            str(out),
+            "--no-network",
+            "--no-external-writes",
+        ]
+        args.remove(omitted_flag)
+
+        result = CliRunner().invoke(trace_optimizer_main, args)
+
+        assert result.exit_code != 0
+        assert expected_message in str(result.exception)

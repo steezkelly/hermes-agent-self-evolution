@@ -318,13 +318,13 @@ def run_gepa_bridge(
 @click.option(
     "--no-network",
     is_flag=True,
-    default=True,
+    default=False,
     help="Safety: no network calls allowed.",
 )
 @click.option(
     "--no-external-writes",
     is_flag=True,
-    default=True,
+    default=False,
     help="Safety: no external writes allowed.",
 )
 def main(
@@ -336,8 +336,11 @@ def main(
     no_external_writes: bool,
 ) -> None:
     """Bridge optimizer templates into GEPA-ready eval datasets."""
-    # Safety flags are asserted at chain level; this module is deterministic
-    # and makes no network calls regardless of flag state.
+    # Safety: direct CLI use must fail closed unless both local-only flags are
+    # present. The deterministic implementation below still records all safety
+    # allowances as false in run_report.json.
+    assert no_network, "network safety disabled"
+    assert no_external_writes, "external writes safety disabled"
 
     result = run_gepa_bridge(
         candidate_artifacts_path=candidate_artifacts,

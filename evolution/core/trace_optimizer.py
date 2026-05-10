@@ -227,13 +227,13 @@ def run_optimizer(
 @click.option(
     "--no-network",
     is_flag=True,
-    default=True,
+    default=False,
     help="Safety: no network calls allowed.",
 )
 @click.option(
     "--no-external-writes",
     is_flag=True,
-    default=True,
+    default=False,
     help="Safety: no external writes allowed.",
 )
 def main(
