@@ -37,6 +37,26 @@ def _write_tool_underuse_trace(path: Path) -> Path:
     return path
 
 
+def _write_healthy_observatory_db(path: Path) -> Path:
+    from evolution.core.observatory.logger import JudgeAuditLogger
+
+    logger = JudgeAuditLogger(db_path=path)
+    for generation in [1, 2, 3]:
+        for index, score in enumerate([0.2, 0.5, 0.8]):
+            logger.log(
+                generation=generation,
+                skill_name="session-end-chain",
+                model_used="minimax/minimax-m2.7",
+                task_id=f"g{generation}-t{index}",
+                expected_behavior="evidence-backed action queue",
+                actual_behavior="structured action item emitted",
+                rubric="score action-router quality",
+                raw_score=score,
+                token_cost_estimate=0.001,
+            )
+    return path
+
+
 def test_baseline_chain_output_is_empty_and_fails_eval():
     from evolution.core.session_end_chain import _baseline_chain_output, evaluate_chain_run
 
@@ -285,3 +305,120 @@ def test_cli_requires_trace(tmp_path):
 
     assert result.exit_code != 0
     assert "Missing option '--trace'" in result.output
+
+
+def test_chain_observe_appends_observatory_health_report(tmp_path):
+    from evolution.core.session_end_chain import run_session_end_chain
+
+    trace = _write_tool_underuse_trace(tmp_path / "session.jsonl")
+    db = _write_healthy_observatory_db(tmp_path / "judge_audit_log.db")
+    result = run_session_end_chain(
+        trace,
+        tmp_path / "out",
+        optimize=True,
+        gepa_bridge=True,
+        observe=True,
+        observatory_db_path=db,
+    )
+
+    assert result["mode"] == "chain_observe"
+    assert result["verdict"] == "pass"
+    assert result["observatory_health"]["verdict"] == "pass"
+    assert result["observatory_health"]["db_path"] == str(db.resolve())
+    assert result["observatory_health"]["total_calls"] == 9
+    assert result["observatory_health"]["alert_count"] == 0
+    assert result["observatory_health"]["alerts"] == []
+    assert result["metrics"]["observatory_alert_count"] == 0
+    assert result["metrics"]["steps_passed"] == 5
+    assert Path(result["observatory_health"]["health_report"]).is_absolute()
+    assert Path(result["observatory_health"]["health_report"]).exists()
+
+
+def test_chain_observe_writes_health_artifact_in_sequence(tmp_path):
+    from evolution.core.session_end_chain import run_session_end_chain
+
+    trace = _write_tool_underuse_trace(tmp_path / "session.jsonl")
+    db = _write_healthy_observatory_db(tmp_path / "judge_audit_log.db")
+    out = tmp_path / "out"
+    run_session_end_chain(trace, out, optimize=True, gepa_bridge=True, observe=True, observatory_db_path=db)
+
+    health_report = out / "observatory_health" / "health_report.json"
+    assert (out / "trace_optimizer" / "run_report.json").exists()
+    assert (out / "gepa_bridge" / "run_report.json").exists()
+    assert health_report.exists()
+    payload = json.loads(health_report.read_text())
+    assert payload["mode"] == "observatory_health"
+    assert payload["verdict"] == "pass"
+    assert payload["health"]["total_calls"] == 9
+
+
+def test_evaluate_chain_run_rejects_observatory_alerts(tmp_path):
+    from evolution.core.session_end_chain import evaluate_chain_run, run_session_end_chain
+
+    trace = _write_tool_underuse_trace(tmp_path / "session.jsonl")
+    db = _write_healthy_observatory_db(tmp_path / "judge_audit_log.db")
+    result = run_session_end_chain(
+        trace,
+        tmp_path / "out",
+        optimize=True,
+        gepa_bridge=True,
+        observe=True,
+        observatory_db_path=db,
+    )
+    broken = {**result, "observatory_health": {**result["observatory_health"], "verdict": "fail", "alert_count": 1}}
+
+    evaluation = evaluate_chain_run(broken)
+
+    assert evaluation["passed"] is False
+    assert any("observatory health" in failure for failure in evaluation["failures"])
+
+
+def test_cli_chain_observe_requires_observatory_db(tmp_path):
+    from evolution.core.session_end_chain import main
+
+    trace = _write_tool_underuse_trace(tmp_path / "session.jsonl")
+    result = CliRunner().invoke(
+        main,
+        [
+            "--trace",
+            str(trace),
+            "--out",
+            str(tmp_path / "out"),
+            "--mode",
+            "chain_observe",
+            "--no-network",
+            "--no-external-writes",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--observatory-db is required for chain_observe" in result.output
+
+
+def test_cli_chain_observe_writes_chain_and_health_report(tmp_path):
+    from evolution.core.session_end_chain import main
+
+    trace = _write_tool_underuse_trace(tmp_path / "session.jsonl")
+    db = _write_healthy_observatory_db(tmp_path / "judge_audit_log.db")
+    out = tmp_path / "out"
+    result = CliRunner().invoke(
+        main,
+        [
+            "--trace",
+            str(trace),
+            "--out",
+            str(out),
+            "--mode",
+            "chain_observe",
+            "--observatory-db",
+            str(db),
+            "--no-network",
+            "--no-external-writes",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    chain_run = json.loads((out / "chain_run.json").read_text())
+    assert chain_run["mode"] == "chain_observe"
+    assert chain_run["observatory_health"]["verdict"] == "pass"
+    assert (out / "observatory_health" / "health_report.json").exists()
