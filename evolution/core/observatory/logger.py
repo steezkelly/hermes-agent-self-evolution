@@ -248,6 +248,9 @@ class JudgeAuditLogger:
                 SELECT error_flag, COUNT(*) as cnt
                 FROM judge_audit_log
                 WHERE error_flag IS NOT NULL
+                  AND error_flag != 0
+                  AND error_flag != '0'
+                  AND error_flag != ''
                   AND generation >= ?
                 GROUP BY error_flag
                 """,
@@ -271,7 +274,7 @@ class JudgeAuditLogger:
                 return 0.0
             errors = conn.execute(
                 "SELECT COUNT(*) FROM judge_audit_log "
-                "WHERE error_flag IS NOT NULL AND generation >= ?"
+                "WHERE error_flag IS NOT NULL AND error_flag != 0 AND error_flag != '0' AND error_flag != '' AND generation >= ?"
                 + (" AND skill_name = ?" if skill_name else ""),
                 ([since_generation] + ([skill_name] if skill_name else [])),
             ).fetchone()[0]
@@ -287,7 +290,7 @@ class JudgeAuditLogger:
             cond = "generation >= ?" + (" AND skill_name = ?" if skill_name else "")
             params = [since_generation] + ([skill_name] if skill_name else [])
             row = conn.execute(
-                f"SELECT AVG(raw_score) as mean FROM judge_audit_log WHERE {cond} AND error_flag IS NULL",
+                f"SELECT AVG(raw_score) as mean FROM judge_audit_log WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')",
                 params,
             ).fetchone()
             return float(row[0]) if row[0] is not None else None
@@ -303,7 +306,7 @@ class JudgeAuditLogger:
             params = [since_generation] + ([skill_name] if skill_name else [])
             scores = [
                 row[0] for row in conn.execute(
-                    f"SELECT raw_score FROM judge_audit_log WHERE {cond} AND error_flag IS NULL",
+                    f"SELECT raw_score FROM judge_audit_log WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')",
                     params,
                 ).fetchall()
             ]
@@ -321,14 +324,14 @@ class JudgeAuditLogger:
             cond = "generation >= ?" + (" AND skill_name = ?" if skill_name else "")
             params = [since_generation] + ([skill_name] if skill_name else [])
             total = conn.execute(
-                f"SELECT COUNT(*) FROM judge_audit_log WHERE {cond} AND error_flag IS NULL",
+                f"SELECT COUNT(*) FROM judge_audit_log WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')",
                 params,
             ).fetchone()[0]
             if total == 0:
                 return 0.0
             dead = conn.execute(
                 f"""SELECT COUNT(*) FROM judge_audit_log
-                    WHERE {cond} AND error_flag IS NULL
+                    WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')
                       AND (raw_score <= 0.05 OR raw_score >= 0.95)""",
                 params,
             ).fetchone()[0]
@@ -378,17 +381,17 @@ class JudgeAuditLogger:
                 f"SELECT COUNT(*) FROM judge_audit_log WHERE {cond}", params
             ) or 0
             errors = fetchone(
-                f"SELECT COUNT(*) FROM judge_audit_log WHERE {cond} AND error_flag IS NOT NULL",
+                f"SELECT COUNT(*) FROM judge_audit_log WHERE {cond} AND error_flag IS NOT NULL AND error_flag != 0 AND error_flag != '0' AND error_flag != '' ",
                 params,
             ) or 0
             mean = fetchone(
-                f"SELECT AVG(raw_score) FROM judge_audit_log WHERE {cond} AND error_flag IS NULL",
+                f"SELECT AVG(raw_score) FROM judge_audit_log WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')",
                 params,
             )
             # Compute std-dev in Python (SQLite doesn't ship STDDEV by default)
             scores = [
                 row[0] for row in conn.execute(
-                    f"SELECT raw_score FROM judge_audit_log WHERE {cond} AND error_flag IS NULL",
+                    f"SELECT raw_score FROM judge_audit_log WHERE {cond} AND (error_flag IS NULL OR error_flag = 0 OR error_flag = '0' OR error_flag = '')",
                     params,
                 ).fetchall()
             ]

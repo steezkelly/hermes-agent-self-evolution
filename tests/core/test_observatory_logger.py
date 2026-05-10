@@ -161,6 +161,34 @@ class TestStats:
         )
         assert tmp_logger.error_rate() == pytest.approx(1 / 5)
 
+    def test_numeric_zero_error_flag_is_not_counted_as_error(self, tmp_logger):
+        for idx, flag in enumerate([None, 0, "0", ""]):
+            tmp_logger.log(
+                generation=1,
+                skill_name="calibration",
+                model_used="manual",
+                task_id=f"ok{idx}",
+                expected_behavior="e",
+                actual_behavior="a",
+                rubric="r",
+                raw_score=0.25 + (idx * 0.1),
+                error_flag=flag,
+            )
+        tmp_logger.log_error(
+            generation=1,
+            skill_name="calibration",
+            model_used="manual",
+            task_id="err",
+            expected_behavior="e",
+            rubric="r",
+            error_flag="ValueError",
+        )
+
+        assert tmp_logger.error_rate() == pytest.approx(1 / 5)
+        assert tmp_logger.summary_stats()["error_calls"] == 1
+        assert tmp_logger.count_errors() == {"ValueError": 1}
+        assert tmp_logger.mean_score() == pytest.approx(np.mean([0.25, 0.35, 0.45, 0.55]))
+
     def test_dead_zone_fraction(self, tmp_logger):
         # 2 in dead zone (0.01, 0.99), 2 not (0.3, 0.7)
         for s in [0.01, 0.3, 0.7, 0.99]:
